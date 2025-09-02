@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conteiner Beer - Sistema Completo</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div class="logo">
+                <i class="fas fa-beer"></i> Conteiner Beer
+            </div>
+            <div class="backup-buttons">
+                <button class="btn-backup" id="export-data-btn" title="Exportar dados"><i class="fas fa-save"></i></button>
+                <button class="btn-backup" id="import-data-btn" title="Importar dados"><i class="fas fa-file-import"></i></button>
+                <span id="last-backup-time"></span>
+            </div>
+            <nav>
+                <ul>
+                    <li><a href="#" class="active" id="nav-dashboard"><i class="fas fa-chart-line"></i> Dashboard</a></li>
+                    <li><a href="#" id="nav-products"><i class="fas fa-wine-bottle"></i> Produtos</a></li>
+                    <li><a href="#" id="nav-sales"><i class="fas fa-cash-register"></i> Vendas</a></li>
+                    <li><a href="#" id="nav-tables"><i class="fas fa-chair"></i> Mesas</a></li>
+                    <li><a href="#" id="nav-receivables"><i class="fas fa-hand-holding-usd"></i> Contas a Receber</a></li>
+                    <li><a href="#" id="nav-expenses"><i class="fas fa-money-bill-wave"></i> Gastos</a></li>
+                    <li><a href="#" id="nav-reports"><i class="fas fa-chart-pie"></i> Relatórios</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <div class="container main-content">
+        <div class="dashboard">
+            <div class="card">
+                <h3><i class="fas fa-wine-bottle"></i> Total de Produtos</h3>
+                <p id="total-products">0</p>
+            </div>
+            <div class="card">
+                <h3><i class="fas fa-boxes"></i> Estoque Total</h3>
+                <p id="total-stock">0 uni.</p>
+            </div>
+            <div class="card sales">
+                <h3><i class="fas fa-shopping-cart"></i> Vendas Hoje</h3>
+                <p id="sales-today">R$ 0,00</p>
+            </div>
+            <div class="card alert" id="low-stock-card">
+                <h3><i class="fas fa-exclamation-triangle"></i> Produtos em Falta</h3>
+                <p id="low-stock">0</p>
+            </div>
+            <div class="card" id="today-sales-card">
+                <h3><i class="fas fa-receipt"></i> Vendas Hoje</h3>
+                <p id="today-sales-count">0 vendas</p>
+            </div>
+            <div class="card">
+                <h3><i class="fas fa-hand-holding-usd"></i> A Receber</h3>
+                <p id="total-receivables">R$ 0,00</p>
+            </div>
+            <div class="card">
+                <h3><i class="fas fa-money-bill-wave"></i> Gastos do Mês</h3>
+                <p id="month-expenses">R$ 0,00</p>
+            </div>
+            <div class="card" id="active-tables-card">
+                <h3><i class="fas fa-users"></i> Mesas Ativas</h3>
+                <p id="active-tables">0</p>
+            </div>
+        </div>
+
+        <div class="dashboard-actions">
+            <button class="btn btn-primary" id="btn-new-product"><i class="fas fa-plus"></i> Novo Produto</button>
+            <button class="btn btn-sales" id="btn-new-sale"><i class="fas fa-cash-register"></i> Nova Venda</button>
+            <button class="btn btn-tables" id="btn-manage-tables"><i class="fas fa-chair"></i> Gerenciar Mesas</button>
+            <button class="btn btn-receivables" id="btn-receivables"><i class="fas fa-hand-holding-usd"></i> Contas a Receber</button>
+            <button class="btn btn-expenses" id="btn-expenses"><i class="fas fa-money-bill-wave"></i> Registrar Gasto</button>
+            <button class="btn btn-warning" id="btn-generate-report"><i class="fas fa-file-pdf"></i> Gerar Relatório</button>
+        </div>
+
+        <div class="content-sections">
+            <div class="content-section" id="products-section">
+                <h2 class="section-title"><i class="fas fa-wine-bottle"></i> Produtos em Destaque</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Produto</th>
+                            <th>Categoria</th>
+                            <th>Quantidade</th>
+                            <th>Valor Unit.</th>
+                            <th>Status</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="products-table-body">
+                        <!-- Conteúdo preenchido por JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="content-section" id="tables-section">
+                <h2 class="section-title"><i class="fas fa-chair"></i> Mesas Ativas</h2>
+                <div class="tables-grid" id="tables-grid">
+                    <!-- Mesas preenchidas por JavaScript -->
+                </div>
+            </div>
+
+            <div class="content-section" id="receivables-section">
+                <h2 class="section-title"><i class="fas fa-hand-holding-usd"></i> Contas a Receber</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Cliente</th>
+                            <th>Valor Total</th>
+                            <th>Valor Recebido</th>
+                            <th>Valor Pendente</th>
+                            <th>Data Venc.</th>
+                            <th>Status</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="receivables-table-body">
+                        <!-- Conteúdo preenchido por JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="content-section" id="expenses-section">
+                <h2 class="section-title"><i class="fas fa-money-bill-wave"></i> Últimos Gastos</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Descrição</th>
+                            <th>Categoria</th>
+                            <th>Valor</th>
+                            <th>Data</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="expenses-table-body">
+                        <!-- Conteúdo preenchido por JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Produtos -->
+    <div id="products-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" id="close-products">&times;</span>
+            <h2 class="section-title"><i class="fas fa-wine-bottle"></i> Gerenciamento de Produtos</h2>
+            
+            <div class="tab-container">
+                <div class="tab-buttons">
+                    <button class="tab-btn active" data-tab="tab-products-list">Lista de Produtos</button>
+                    <button class="tab-btn" data-tab="tab-add-product">Adicionar Produto</button>
+                    <button class="tab-btn" data-tab="tab-categories">Categorias</button>
+                </div>
+                
+                <div id="tab-products-list" class="tab-content active">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Produto</th>
+                                <th>Categoria</th>
+                                <th>Quantidade</th>
+                                <th>Valor Unit.</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="modal-products-table-body">
+                            <!-- Conteúdo preenchido por JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div id="tab-add-product" class="tab-content">
+                    <form id="add-product-form">
+                        <input type="hidden" id="edit-product-id" value="">
+                        <div class="form-group">
+                            <label for="productName">Nome do Produto</label>
+                            <input type="text" id="productName" class="form-control" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="productCategory">Categoria</label>
+                            <select id="productCategory" class="form-control" required>
+                                <option value="">Selecione uma categoria</option>
+                                <!-- Categorias preenchidas por JavaScript -->
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="productQuantity">Quantidade</label>
+                            <input type="number" id="productQuantity" class="form-control" required min="0">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="productPrice">Preço Unitário (R$)</label>
+                            <input type="number" step="0.01" id="productPrice" class="form-control" required min="0">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="productMinStock">Estoque Mínimo</label>
+                            <input type="number" id="productMinStock" class="form-control" required min="0">
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary" id="submit-product-btn">Adicionar Produto</button>
+                    </form>
+                </div>
+                
+                <div id="tab-categories" class="tab-content">
+                    <div class="form-group">
+                        <label for="newCategory">Nova Categoria</label>
+                        <input type="text" id="newCategory" class="form-control">
+                    </div>
+                    <button class="btn" id="btn-add-category">Adicionar Categoria</button>
+                    
+                    <h3 style="margin-top: 20px; color: var(--neon-green);">Categorias Existentes</h3>
+                    <ul id="categories-list" style="margin-top: 10px; list-style-type: none;">
+                        <!-- Categorias preenchidas por JavaScript -->
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Vendas -->
+    <div id="sales-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" id="close-sales">&times;</span>
+            <h2 class="sales-section-title"><i class="fas fa-cash-register"></i> Registro de Vendas</h2>
+            
+            <div class="tab-container">
+                <div class="tab-buttons">
+                    <button class="tab-btn active" data-tab="tab-new-sale">Nova Venda</button>
+                    <button class="tab-btn" data-tab="tab-sales-history">Histórico</button>
+                </div>
+                
+                <div id="tab-new-sale" class="tab-content active">
+                    <div class="form-group">
+                        <label for="sale-type">Tipo de Venda</label>
+                        <select id="sale-type" class="form-control">
+                            <option value="normal">Venda Normal</option>
+                            <option value="table">Venda para Mesa</option>
+                            <option value="credit">Venda a Prazo</option>
+                        </select>
+                    </div>
+
+                    <div id="table-selection" class="form-group" style="display: none;">
+                        <label for="sale-table">Selecionar Mesa</label>
+                        <select id="sale-table" class="form-control">
+                            <option value="">Selecione uma mesa</option>
+                            <!-- Mesas preenchidas por JavaScript -->
+                        </select>
+                    </div>
+
+                    <div id="client-selection" class="form-group" style="display: none;">
+                        <label for="sale-client">Cliente</label>
+                        <input type="text" id="sale-client" class="form-control" placeholder="Nome do cliente">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="search-product">Buscar Produto</label>
+                        <input type="text" id="search-product" class="form-control" placeholder="Digite o nome do produto...">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="sale-product">Selecionar Produto</label>
+                        <select id="sale-product" class="form-control">
+                            <option value="">Selecione um produto</option>
+                            <!-- Produtos preenchidos por JavaScript -->
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="sale-quantity">Quantidade</label>
+                        <input type="number" id="sale-quantity" class="form-control" min="1" value="1">
+                    </div>
+                    
+                    <button class="btn btn-sales" id="btn-add-to-sale">Adicionar à Venda</button>
+                    
+                    <h3 style="margin-top: 20px; color: var(--neon-orange);">Itens da Venda</h3>
+                    <div id="sale-items">
+                        <!-- Itens preenchidos por JavaScript -->
+                    </div>
+                    
+                    <div class="sale-total">
+                        Total: <span id="sale-total-amount">R$ 0,00</span>
+                    </div>
+                    
+                    <!-- Opções de Pagamento -->
+                    <h3 style="margin-top: 20px; color: var(--neon-orange);">Forma de Pagamento</h3>
+                    <div class="payment-options">
+                        <div class="payment-option" data-method="dinheiro">
+                            <h4>Dinheiro</h4>
+                            <p>Pagamento à vista</p>
+                        </div>
+                        <div class="payment-option" data-method="pix">
+                            <h4>PIX</h4>
+                            <p>Pagamento instantâneo</p>
+                        </div>
+                        <div class="payment-option" data-method="cartao">
+                            <h4>Cartão</h4>
+                            <p>Crédito/Débito</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Detalhes do Pagamento -->
+                    <div id="payment-details" class="payment-details">
+                        <div id="cash-details">
+                            <div class="form-group">
+                                <label for="cash-received">Valor Recebido (R$)</label>
+                                <input type="number" step="0.01" id="cash-received" class="form-control" min="0">
+                            </div>
+                            <div id="cash-change" style="color: var(--neon-green); font-weight: bold; margin-top: 10px;">
+                                Troco: R$ 0,00
+                            </div>
+                        </div>
+                        
+                        <div id="card-details">
+                            <div class="form-group">
+                                <label for="card-fee">Taxa do Cartão (R$)</label>
+                                <input type="number" step="0.01" id="card-fee" class="form-control" min="0" value="0">
+                            </div>
+                            <div id="card-total" style="color: var(--neon-green); font-weight: bold; margin-top: 10px;">
+                                Total com Taxa: R$ 0,00
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="payment-summary">
+                        <div id="payment-method-display">Método selecionado: Nenhum</div>
+                        <div id="payment-total">Valor a pagar: R$ 0,00</div>
+                    </div>
+                    
+                    <div style="text-align: right; margin-top: 20px;">
+                        <button class="btn btn-sales" id="btn-finalize-sale">Finalizar Venda</button>
+                    </div>
+                </div>
+                
+                <div id="tab-sales-history" class="tab-content">
+                    <div class="form-group">
+                        <label for="sale-date">Filtrar por Data</label>
+                        <input type="date" id="sale-date" class="form-control">
+                    </div>
+                    
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Produto</th>
+                                <th>Quantidade</th>
+                                <th>Valor Unit.</th>
+                                <th>Total</th>
+                                <th>Pagamento</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sales-history-body">
+                            <!-- Conteúdo preenchido por JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Mesas -->
+    <div id="tables-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" id="close-tables">&times;</span>
+            <h2 class="section-title"><i class="fas fa-chair"></i> Gerenciamento de Mesas</h2>
+            
+            <div class="tab-container">
+                <div class="tab-buttons">
+                    <button class="tab-btn active" data-tab="tab-tables-list">Mesas</button>
+                    <button class="tab-btn" data-tab="tab-add-table">Adicionar Mesa</button>
+                </div>
+                
+                <div id="tab-tables-list" class="tab-content active">
+                    <div class="tables-management" id="tables-management">
+                        <!-- Mesas preenchidas por JavaScript -->
+                    </div>
+                </div>
+                
+                <div id="tab-add-table" class="tab-content">
+                    <form id="add-table-form">
+                        <div class="form-group">
+                            <label for="tableNumber">Número da Mesa</label>
+                            <input type="number" id="tableNumber" class="form-control" required min="1">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="tableCapacity">Capacidade (pessoas)</label>
+                            <input type="number" id="tableCapacity" class="form-control" required min="1" value="4">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="tableDescription">Descrição (opcional)</label>
+                            <input type="text" id="tableDescription" class="form-control">
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary">Adicionar Mesa</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Contas a Receber -->
+    <div id="receivables-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" id="close-receivables">&times;</span>
+            <h2 class="section-title"><i class="fas fa-hand-holding-usd"></i> Contas a Receber</h2>
+            
+            <div class="tab-container">
+                <div class="tab-buttons">
+                    <button class="tab-btn active" data-tab="tab-receivables-list">Contas a Receber</button>
+                    <button class="tab-btn" data-tab="tab-receive-payment">Receber Pagamento</button>
+                    <button class="tab-btn" data-tab="tab-add-receivable">Nova Conta</button>
+                </div>
+                
+                <div id="tab-receivables-list" class="tab-content active">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Cliente</th>
+                                <th>Valor Total</th>
+                                <th>Valor Recebido</th>
+                                <th>Valor Pendente</th>
+                                <th>Data Venc.</th>
+                                <th>Status</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="receivables-list-body">
+                            <!-- Conteúdo preenchido por JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div id="tab-receive-payment" class="tab-content">
+                    <form id="receive-payment-form">
+                        <div class="form-group">
+                            <label for="receivable-select">Selecionar Conta</label>
+                            <select id="receivable-select" class="form-control" required>
+                                <option value="">Selecione uma conta</option>
+                                <!-- Contas preenchidas por JavaScript -->
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="payment-amount">Valor do Pagamento (R$)</label>
+                            <input type="number" step="0.01" id="payment-amount" class="form-control" required min="0">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="payment-date">Data do Pagamento</label>
+                            <input type="date" id="payment-date" class="form-control" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="payment-method">Método de Pagamento</label>
+                            <select id="payment-method" class="form-control" required>
+                                <option value="dinheiro">Dinheiro</option>
+                                <option value="pix">PIX</option>
+                                <option value="cartao">Cartão</option>
+                                <option value="transferencia">Transferência</option>
+                            </select>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary">Registrar Pagamento</button>
+                    </form>
+                </div>
+                
+                <div id="tab-add-receivable" class="tab-content">
+                    <form id="add-receivable-form">
+                        <div class="form-group">
+                            <label for="receivable-client">Cliente</label>
+                            <input type="text" id="receivable-client" class="form-control" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="receivable-amount">Valor Total (R$)</label>
+                            <input type="number" step="0.01" id="receivable-amount" class="form-control" required min="0">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="receivable-due-date">Data de Vencimento</label>
+                            <input type="date" id="receivable-due-date" class="form-control" required>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary">Adicionar Conta</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Gastos -->
+    <div id="expenses-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" id="close-expenses">&times;</span>
+            <h2 class="section-title"><i class="fas fa-money-bill-wave"></i> Gerenciamento de Gastos</h2>
+            
+            <div class="tab-container">
+                <div class="tab-buttons">
+                    <button class="tab-btn active" data-tab="tab-expenses-list">Gastos</button>
+                    <button class="tab-btn" data-tab="tab-add-expense">Adicionar Gasto</button>
+                    <button class="tab-btn" data-tab="tab-expense-categories">Categorias</button>
+                </div>
+                
+                <div id="tab-expenses-list" class="tab-content active">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Descrição</th>
+                                <th>Categoria</th>
+                                <th>Valor</th>
+                                <th>Data</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="expenses-list-body">
+                            <!-- Conteúdo preenchido por JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div id="tab-add-expense" class="tab-content">
+                    <form id="add-expense-form">
+                        <div class="form-group">
+                            <label for="expense-description">Descrição</label>
+                            <input type="text" id="expense-description" class="form-control" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="expense-category">Categoria</label>
+                            <select id="expense-category" class="form-control" required>
+                                <option value="">Selecione uma categoria</option>
+                                <!-- Categorias preenchidas por JavaScript -->
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="expense-amount">Valor (R$)</label>
+                            <input type="number" step="0.01" id="expense-amount" class="form-control" required min="0">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="expense-date">Data</label>
+                            <input type="date" id="expense-date" class="form-control" required>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary">Adicionar Gasto</button>
+                    </form>
+                </div>
+                
+                <div id="tab-expense-categories" class="tab-content">
+                    <div class="form-group">
+                        <label for="new-expense-category">Nova Categoria</label>
+                        <input type="text" id="new-expense-category" class="form-control">
+                    </div>
+                    <button class="btn" id="btn-add-expense-category">Adicionar Categoria</button>
+                    
+                    <h3 style="margin-top: 20px; color: var(--neon-green);">Categorias Existentes</h3>
+                    <ul id="expense-categories-list" style="margin-top: 10px; list-style-type: none;">
+                        <!-- Categorias preenchidas por JavaScript -->
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Relatórios -->
+    <div id="reports-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" id="close-reports">&times;</span>
+            <h2 class="section-title"><i class="fas fa-chart-pie"></i> Relatórios</h2>
+            
+            <div class="form-group">
+                <label for="report-type">Tipo de Relatório</label>
+                <select id="report-type" class="form-control">
+                    <option value="stock">Relatório de Estoque</option>
+                    <option value="sales">Relatório de Vendas</option>
+                    <option value="low-stock">Produtos com Estoque Baixo</option>
+                    <option value="daily-sales">Vendas do Dia</option>
+                    <option value="receivables">Contas a Receber</option>
+                    <option value="expenses">Relatório de Gastos</option>
+                    <option value="tables">Relatório de Mesas</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="report-start-date">Data Inicial</label>
+                <input type="date" id="report-start-date" class="form-control">
+            </div>
+            
+            <div class="form-group">
+                <label for="report-end-date">Data Final</label>
+                <input type="date" id="report-end-date" class="form-control">
+            </div>
+            
+            <button class="btn btn-primary" id="btn-generate-pdf">Gerar PDF</button>
+            
+            <div id="report-preview" style="margin-top: 20px;">
+                <!-- Preview do relatório -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Produtos em Falta -->
+    <div id="low-stock-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" id="close-low-stock">&times;</span>
+            <h2 class="section-title"><i class="fas fa-exclamation-triangle"></i> Produtos com Estoque Baixo</h2>
+            
+            <div class="filter-options" style="margin-bottom: 20px;">
+                <button class="btn btn-sales active" data-filter="all">Todos</button>
+                <button class="btn" data-filter="zero">Zerados</button>
+                <button class="btn" data-filter="low">Estoque Baixo</button>
+            </div>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>Produto</th>
+                        <th>Categoria</th>
+                        <th>Quantidade</th>
+                        <th>Estoque Mínimo</th>
+                        <th>Status</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="low-stock-table-body">
+                    <!-- Conteúdo preenchido por JavaScript -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Modal Vendas do Dia -->
+    <div id="today-sales-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" id="close-today-sales">&times;</span>
+            <h2 class="sales-section-title"><i class="fas fa-shopping-cart"></i> Vendas do Dia</h2>
+            
+            <div class="filter-options" style="margin-bottom: 20px;">
+                <button class="btn btn-sales active" data-sales-filter="all">Todas</button>
+                <button class="btn" data-sales-filter="product">Por Produto</button>
+                <button class="btn" data-sales-filter="category">Por Categoria</button>
+            </div>
+            
+            <div class="sales-summary" style="margin-bottom: 20px; padding: 15px; background-color: rgba(0,0,0,0.3); border-radius: 8px;">
+                <h3 style="color: var(--neon-green); margin-bottom: 10px;">Resumo do Dia</h3>
+                <p>Total de vendas: <span id="modal-sales-count">0</span> vendas</p>
+                <p>Valor total: <span id="modal-sales-total">R$ 0,00</span></p>
+                <p>Produtos vendidos: <span id="modal-products-sold">0</span> unidades</p>
+            </div>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>Produto</th>
+                        <th>Categoria</th>
+                        <th>Quantidade</th>
+                        <th>Valor Unit.</th>
+                        <th>Total</th>
+                        <th>Pagamento</th>
+                    </tr>
+                </thead>
+                <tbody id="today-sales-table-body">
+                    <!-- Conteúdo preenchido por JavaScript -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <footer>
+        <div class="container">
+            <p>Conteiner Beer - Sistema Completo de Gestão &copy; 2023 - Todos os direitos reservados</p>
+            
+            <div style="margin-top: 20px; text-align: center; padding: 15px;">
+                <button class="btn btn-warning" id="btn-clear-sales">
+                    <i class="fas fa-trash"></i> Limpar Vendas do Dia
+                </button>
+                <div id="daily-sales-summary" style="padding: 15px; background-color: rgba(0,0,0,0.3); border-radius: 8px; display: none;">
+                    <h3 style="color: var(--neon-green); margin-bottom: 10px;">Resumo do Dia</h3>
+                    <p>Total de vendas: <span id="daily-sales-count">0</span> vendas</p>
+                    <p>Valor total: <span id="daily-sales-total">R$ 0,00</span></p>
+                    <p style="color: var(--neon-yellow); font-weight: bold;">Vendas limpas com sucesso!</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
