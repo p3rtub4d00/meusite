@@ -5,7 +5,8 @@ document.addEventListener('DOMContentLoaded', () => {
         sales: [],
         expenses: [],
         receivables: [],
-        tables: [], // NOVO: Para armazenar as mesas
+        tables: [],
+        openOrders: {}, // CORREÇÃO: Adicionado para que o sistema principal reconheça e não apague as comandas abertas.
         settings: {
             company: {
                 name: "CONTEINER BEER",
@@ -110,7 +111,6 @@ document.addEventListener('DOMContentLoaded', () => {
         closingInitialValue: document.getElementById('closingInitialValue'),
         closingExpenses: document.getElementById('closingExpenses'),
         closingExpectedCash: document.getElementById('closingExpectedCash'),
-        // NOVO: Elementos para Gerenciamento de Mesas
         addTableForm: document.getElementById('addTableForm'),
         tableNameInput: document.getElementById('tableNameInput'),
         tablesList: document.getElementById('tablesList'),
@@ -600,13 +600,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 showSaleDetailsModal(id);
             }
 
-            // NOVO: Listener para o botão de deletar mesa
             if (target.classList.contains('btn-delete-table')) {
                 const tableId = Number(target.dataset.id);
                 if (confirm("Tem certeza que deseja remover esta mesa?")) {
                     DB.tables = DB.tables.filter(table => table.id !== tableId);
                     saveDB();
-                    renderTables(); // Apenas renderiza a lista de mesas novamente
+                    renderTables();
                     showNotification('Mesa Removida', 'A mesa foi removida com sucesso.', 'success');
                 }
             }
@@ -639,7 +638,6 @@ document.addEventListener('DOMContentLoaded', () => {
             elements.cashClosingDate.value = getTodayDate();
         }
 
-        // NOVO: Listener para o formulário de adicionar mesa
         if (elements.addTableForm) {
             elements.addTableForm.addEventListener('submit', (e) => {
                 e.preventDefault();
@@ -651,8 +649,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     };
                     DB.tables.push(newTable);
                     saveDB();
-                    renderTables(); // Re-renderiza a lista de mesas
-                    elements.tableNameInput.value = ''; // Limpa o campo
+                    renderTables();
+                    elements.tableNameInput.value = '';
                     showNotification('Mesa Adicionada', `A mesa "${tableName}" foi adicionada.`, 'success');
                 }
             });
@@ -660,7 +658,6 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // --- RENDERIZAÇÃO DE DADOS ---
-    // NOVO: Função para renderizar a lista de mesas
     const renderTables = () => {
         if (!elements.tablesList) return;
         elements.tablesList.innerHTML = '';
@@ -681,7 +678,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderSales();
         renderExpenses();
         renderReceivables();
-        renderTables(); // Adicionado para renderizar as mesas
+        renderTables();
         updateNotificationsUI();
         loadSettingsForms();
     };
