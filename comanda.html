@@ -109,6 +109,26 @@
         </div>
     </div>
 
+    <div id="paymentModal" class="modal-container hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="paymentModalTitle">Finalizar Pagamento</h2>
+            </div>
+            <div id="paymentModalBody" class="modal-body">
+                <h3 style="text-align: center; margin-bottom: 20px;">Total a Pagar: <span id="paymentTotalAmount"></span></h3>
+                <p style="text-align: center;">Selecione o método de pagamento:</p>
+            </div>
+            <div class="modal-footer" id="paymentOptionsFooter" style="justify-content: center; gap: 15px; flex-wrap: wrap;">
+                <button class="btn btn-success" data-method="Dinheiro"><i class="fas fa-money-bill-wave"></i> Dinheiro</button>
+                <button class="btn btn-primary" data-method="Cartão"><i class="far fa-credit-card"></i> Cartão</button>
+                <button class="btn btn-info" data-method="PIX">PIX</button>
+            </div>
+            <div class="modal-footer" style="justify-content: flex-end; border-top: 1px solid var(--border-color); margin-top: 10px;">
+                 <button class="btn btn-secondary" id="paymentCancelBtn">Cancelar Pagamento</button>
+            </div>
+        </div>
+    </div>
+
     <script src="comanda.js"></script>
 </body>
 </html>
