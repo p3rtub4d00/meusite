@@ -3,12 +3,19 @@ document.addEventListener('DOMContentLoaded', () => {
     let DB = {};
     const elements = {
         tablesGrid: document.getElementById('tablesGrid'),
-        modalContainer: document.getElementById('orderModal'),
+        orderModal: document.getElementById('orderModal'),
         modalTitle: document.getElementById('orderModal').querySelector('#modalTitle'),
         modalBody: document.getElementById('orderModal').querySelector('#modalBody'),
         modalCloseBtn: document.getElementById('orderModal').querySelector('#modalCloseBtn'),
         modalCancelBtn: document.getElementById('orderModal').querySelector('#modalCancelBtn'),
         closeBillBtn: document.getElementById('orderModal').querySelector('#closeBillBtn'),
+        
+        // NOVO: Elementos para o Modal de Pagamento
+        paymentModal: document.getElementById('paymentModal'),
+        paymentModalTitle: document.getElementById('paymentModal').querySelector('#paymentModalTitle'),
+        paymentTotalAmount: document.getElementById('paymentModal').querySelector('#paymentTotalAmount'),
+        paymentOptionsFooter: document.getElementById('paymentModal').querySelector('#paymentOptionsFooter'),
+        paymentCancelBtn: document.getElementById('paymentModal').querySelector('#paymentCancelBtn'),
     };
     let currentTableId = null;
 
@@ -16,7 +23,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const loadDB = () => {
         const dbData = localStorage.getItem('conteinerBeerDB');
         DB = dbData ? JSON.parse(dbData) : { products: [], sales: [], tables: [], openOrders: {} };
-        // Garante que a estrutura para comandas exista
         if (!DB.openOrders) {
             DB.openOrders = {};
         }
@@ -61,18 +67,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const table = DB.tables.find(t => t.id === tableId);
         if (!table) return;
 
-        // Cria uma comanda se não existir
         if (!DB.openOrders[tableId]) {
             DB.openOrders[tableId] = { items: [], total: 0 };
         }
 
         elements.modalTitle.textContent = `Comanda - ${table.name}`;
         renderOrderModalBody();
-        elements.modalContainer.classList.remove('hidden');
+        elements.orderModal.classList.remove('hidden');
     };
 
-    const closeModal = () => {
-        elements.modalContainer.classList.add('hidden');
+    const closeOrderModal = () => {
+        elements.orderModal.classList.add('hidden');
         currentTableId = null;
     };
 
@@ -122,7 +127,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- AÇÕES ---
     const addItemToOrder = () => {
-        const productId = document.getElementById('productSelector').value;
+        const productSelector = document.getElementById('productSelector');
+        if(!productSelector || !productSelector.value) {
+            alert("Não há produtos em estoque para adicionar.");
+            return;
+        }
+        
+        const productId = productSelector.value;
         const quantity = parseInt(document.getElementById('quantitySelector').value, 10);
         const product = DB.products.find(p => p.id === Number(productId));
 
@@ -138,7 +149,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const order = DB.openOrders[currentTableId];
         
-        // Verifica se o item já está na comanda para somar a quantidade
         const existingItem = order.items.find(item => item.id === product.id);
         if (existingItem) {
             existingItem.quantity += quantity;
@@ -162,16 +172,23 @@ document.addEventListener('DOMContentLoaded', () => {
         renderOrderModalBody();
     };
 
-    const closeBill = () => {
+    const showPaymentModal = () => {
         const order = DB.openOrders[currentTableId];
         if (order.items.length === 0) {
             alert("Não é possível fechar uma comanda vazia.");
             return;
         }
+        elements.paymentTotalAmount.textContent = formatCurrency(order.total);
+        closeOrderModal();
+        elements.paymentModal.classList.remove('hidden');
+    };
 
-        // Simula o fechamento como uma venda
-        const paymentMethod = prompt("Qual a forma de pagamento? (Dinheiro, PIX, Cartão)", "Dinheiro");
-        if (!paymentMethod) return; // Usuário cancelou
+    const closePaymentModal = () => {
+        elements.paymentModal.classList.add('hidden');
+    };
+
+    const finalizeSale = (paymentMethod) => {
+        const order = DB.openOrders[currentTableId];
 
         const newSale = {
             id: Date.now(),
@@ -181,10 +198,9 @@ document.addEventListener('DOMContentLoaded', () => {
             total: order.total,
             status: 'Pago',
             paymentMethod: paymentMethod,
-            payment: {} // Simplificado para este módulo
+            payment: {}
         };
 
-        // Atualiza o estoque
         order.items.forEach(item => {
             const productInDB = DB.products.find(p => p.id === item.id);
             if (productInDB) {
@@ -192,14 +208,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // Adiciona a venda e remove a comanda aberta
         DB.sales.push(newSale);
         delete DB.openOrders[currentTableId];
 
         saveDB();
-        closeModal();
+        closePaymentModal();
         renderTablesGrid();
-        alert(`Conta fechada com sucesso no valor de ${formatCurrency(newSale.total)}!`);
+        alert(`Conta fechada com sucesso no valor de ${formatCurrency(newSale.total)} em ${paymentMethod}!`);
     };
 
     // --- INICIALIZAÇÃO E EVENT LISTENERS ---
@@ -207,18 +222,31 @@ document.addEventListener('DOMContentLoaded', () => {
         loadDB();
         renderTablesGrid();
 
-        // Listeners do Modal
-        elements.modalCloseBtn.addEventListener('click', closeModal);
-        elements.modalCancelBtn.addEventListener('click', closeModal);
-        elements.closeBillBtn.addEventListener('click', closeBill);
+        // Listeners do Modal de Comanda
+        elements.modalCloseBtn.addEventListener('click', closeOrderModal);
+        elements.modalCancelBtn.addEventListener('click', closeOrderModal);
+        elements.closeBillBtn.addEventListener('click', showPaymentModal);
 
-        // Listener dinâmico para ações dentro do modal
+        // Listeners do Modal de Pagamento
+        elements.paymentCancelBtn.addEventListener('click', closePaymentModal);
+        elements.paymentOptionsFooter.addEventListener('click', (e) => {
+            const target = e.target.closest('button');
+            if (target && target.dataset.method) {
+                const paymentMethod = target.dataset.method;
+                finalizeSale(paymentMethod);
+            }
+        });
+
+        // Listener dinâmico para ações dentro do modal de comanda
         elements.modalBody.addEventListener('click', (e) => {
-            if (e.target.id === 'addItemBtn') {
+            const target = e.target.closest('button');
+            if (!target) return;
+
+            if (target.id === 'addItemBtn') {
                 addItemToOrder();
             }
-            if (e.target.classList.contains('remove-item-btn')) {
-                const itemIndex = e.target.dataset.index;
+            if (target.classList.contains('remove-item-btn')) {
+                const itemIndex = target.dataset.index;
                 removeItemFromOrder(itemIndex);
             }
         });
