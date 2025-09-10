@@ -10,7 +10,6 @@ document.addEventListener('DOMContentLoaded', () => {
         modalCancelBtn: document.getElementById('orderModal').querySelector('#modalCancelBtn'),
         closeBillBtn: document.getElementById('orderModal').querySelector('#closeBillBtn'),
         
-        // NOVO: Elementos para o Modal de Pagamento
         paymentModal: document.getElementById('paymentModal'),
         paymentModalTitle: document.getElementById('paymentModal').querySelector('#paymentModalTitle'),
         paymentTotalAmount: document.getElementById('paymentModal').querySelector('#paymentTotalAmount'),
@@ -22,9 +21,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- FUNÇÕES DE DADOS ---
     const loadDB = () => {
         const dbData = localStorage.getItem('conteinerBeerDB');
-        DB = dbData ? JSON.parse(dbData) : { products: [], sales: [], tables: [], openOrders: {} };
+        DB = dbData ? JSON.parse(dbData) : { products: [], sales: [], tables: [], openOrders: {}, notifications: [] };
         if (!DB.openOrders) {
             DB.openOrders = {};
+        }
+        if (!DB.notifications) {
+            DB.notifications = [];
         }
     };
 
@@ -211,10 +213,20 @@ document.addEventListener('DOMContentLoaded', () => {
         DB.sales.push(newSale);
         delete DB.openOrders[currentTableId];
 
+        // CORREÇÃO: Substituindo o alert() por uma notificação no sistema.
+        const notification = {
+            id: Date.now(),
+            title: 'Venda Registrada (Comanda)',
+            message: `Venda da mesa "${newSale.client}" finalizada com sucesso no valor de ${formatCurrency(newSale.total)}.`,
+            type: 'success',
+            timestamp: new Date(),
+            read: false
+        };
+        DB.notifications.unshift(notification);
+
         saveDB();
         closePaymentModal();
         renderTablesGrid();
-        alert(`Conta fechada com sucesso no valor de ${formatCurrency(newSale.total)} em ${paymentMethod}!`);
     };
 
     // --- INICIALIZAÇÃO E EVENT LISTENERS ---
@@ -222,12 +234,10 @@ document.addEventListener('DOMContentLoaded', () => {
         loadDB();
         renderTablesGrid();
 
-        // Listeners do Modal de Comanda
         elements.modalCloseBtn.addEventListener('click', closeOrderModal);
         elements.modalCancelBtn.addEventListener('click', closeOrderModal);
         elements.closeBillBtn.addEventListener('click', showPaymentModal);
 
-        // Listeners do Modal de Pagamento
         elements.paymentCancelBtn.addEventListener('click', closePaymentModal);
         elements.paymentOptionsFooter.addEventListener('click', (e) => {
             const target = e.target.closest('button');
@@ -237,7 +247,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // Listener dinâmico para ações dentro do modal de comanda
         elements.modalBody.addEventListener('click', (e) => {
             const target = e.target.closest('button');
             if (!target) return;
