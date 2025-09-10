@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comanda de Mesas - CONTEINER BEER</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        /* Estilos específicos para a tela de comanda */
+        body {
+            padding: 20px;
+        }
+        .header-comanda {
+            text-align: center;
+            margin-bottom: 30px;
+            color: var(--primary-color);
+        }
+        .header-comanda i {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+        #tablesGrid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 20px;
+        }
+        .table-item {
+            aspect-ratio: 1 / 1;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            font-size: 1.1rem;
+            font-weight: bold;
+        }
+        .table-item:hover {
+            border-color: var(--primary-color);
+            background-color: rgba(255, 94, 0, 0.1);
+        }
+        .table-item.free {
+            color: var(--success-color);
+        }
+        .table-item.occupied {
+            color: var(--warning-color);
+            background-color: rgba(255, 193, 7, 0.1);
+            border-color: var(--warning-color);
+        }
+        .table-item .status {
+            font-size: 0.8rem;
+            font-weight: normal;
+        }
+        .back-link {
+            display: block;
+            text-align: center;
+            margin-top: 40px;
+            color: var(--primary-light);
+            text-decoration: none;
+        }
+        .order-item-list {
+            list-style: none;
+            padding: 0;
+        }
+        .order-item-list li {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .modal-footer-comanda {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+        }
+    </style>
+</head>
+<body class="dark-theme">
+
+    <div class="header-comanda">
+        <i class="fas fa-tablet-alt"></i>
+        <h1>Comanda de Mesas</h1>
+    </div>
+
+    <div id="tablesGrid">
+        </div>
+
+    <a href="index.html" class="back-link">
+        <i class="fas fa-arrow-left"></i> Voltar para o Sistema Principal
+    </a>
+
+    <div id="orderModal" class="modal-container hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle"></h2>
+                <button id="modalCloseBtn" class="modal-close">&times;</button>
+            </div>
+            <div id="modalBody" class="modal-body">
+                </div>
+            <div class="modal-footer">
+                <div class="modal-footer-comanda">
+                    <button class="btn btn-danger" id="closeBillBtn"><i class="fas fa-dollar-sign"></i> Fechar Conta</button>
+                    <button class="btn btn-secondary" id="modalCancelBtn">Voltar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="comanda.js"></script>
+</body>
+</html>
