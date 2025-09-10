@@ -1,2338 +1,1742 @@
-// Dados iniciais (serão substituídos pelos dados salvos localmente)
-let products = [
-    { id: 1, name: "Vodka Smirnoff", category: "Destilados", quantity: 45, price: 29.90, minStock: 10 },
-    { id: 2, name: "Cerveja Heineken", category: "Cervejas", quantity: 120, price: 7.90, minStock: 30 },
-    { id: 3, name: "Vinho Tinto Chileno", category: "Vinhos", quantity: 32, price: 49.90, minStock: 5 },
-    { id: 4, name: "Whisky Johnnie Walker", category: "Destilados", quantity: 8, price: 129.90, minStock: 5 },
-    { id: 5, name: "Energético Red Bull", category: "Energéticos", quantity: 0, price: 11.90, minStock: 20 }
-];
+document.addEventListener('DOMContentLoaded', () => {
+    // --- VARIÁVEIS GLOBAIS E ESTADO DA APLICAÇÃO ---
+    const DB = {
+        products: [],
+        sales: [],
+        expenses: [],
+        receivables: [],
+        tables: [], // NOVO: Para armazenar as mesas
+        settings: {
+            company: {
+                name: "CONTEINER BEER",
+                address: "",
+                phone: "",
+                email: ""
+            },
+            sales: {
+                defaultPaymentMethod: "Dinheiro",
+                taxPercentage: 0,
+                enableStockControl: true,
+                enableLowStockAlert: true
+            },
+            notifications: {
+                notifyLowStock: true,
+                notifyOverdue: true,
+                notifyDailySales: true,
+                notificationSound: "default"
+            },
+            backup: {
+                frequency: 30,
+                notifyOnBackup: true
+            }
+        },
+        users: [
+            { username: "admin", password: "admin", name: "Administrador", role: "admin" }
+        ],
+        notifications: []
+    };
 
-let categories = ["Cervejas", "Destilados", "Vinhos", "Energéticos", "Refrigerantes", "Águas", "Sucos"];
+    let currentUser = null;
+    let backupInterval = null;
+    let salesChart = null;
+    let productsChart = null;
 
-let sales = [
-    { id: 1, date: "2023-10-25", productId: 2, quantity: 10, price: 7.90, paymentMethod: "dinheiro" },
-    { id: 2, date: "2023-10-25", productId: 1, quantity: 2, price: 29.90, paymentMethod: "pix" },
-    { id: 3, date: "2023-10-24", productId: 3, quantity: 3, price: 49.90, paymentMethod: "cartao", cardFee: 2.50 },
-    { id: 4, date: "2023-10-24", productId: 4, quantity: 1, price: 129.90, paymentMethod: "cartao", cardFee: 5.00 }
-];
+    // --- ELEMENTOS DO DOM ---
+    const elements = {
+        loginScreen: document.getElementById('loginScreen'),
+        mainSystem: document.getElementById('mainSystem'),
+        loginForm: document.getElementById('loginForm'),
+        username: document.getElementById('username'),
+        password: document.getElementById('password'),
+        sidebar: document.querySelector('.sidebar'),
+        sidebarToggle: document.getElementById('sidebarToggle'),
+        navLinks: document.querySelectorAll('.nav-link'),
+        pageTitle: document.getElementById('pageTitle'),
+        userName: document.getElementById('userName'),
+        logoutBtn: document.getElementById('logoutBtn'),
+        themeToggle: document.getElementById('themeToggle'),
+        notificationsBtn: document.getElementById('notificationsBtn'),
+        notificationCount: document.getElementById('notificationCount'),
+        notificationsPanel: document.getElementById('notificationsPanel'),
+        notificationsList: document.getElementById('notificationsList'),
+        clearNotificationsBtn: document.getElementById('clearNotificationsBtn'),
+        quickSaleBtn: document.getElementById('quickSaleBtn'),
+        todayRevenue: document.getElementById('todayRevenue'),
+        salesCount: document.getElementById('salesCount'),
+        stockValue: document.getElementById('stockValue'),
+        stockItems: document.getElementById('stockItems'),
+        receivablesValue: document.getElementById('receivablesValue'),
+        receivablesCount: document.getElementById('receivablesCount'),
+        lowStockCount: document.getElementById('lowStockCount'),
+        lowStockItems: document.getElementById('lowStockItems'),
+        monthExpenses: document.getElementById('monthExpenses'),
+        dailyAverage: document.getElementById('dailyAverage'),
+        highestExpense: document.getElementById('highestExpense'),
+        clearSalesBtn: document.getElementById('clearSalesBtn'),
+        recentSalesTable: document.getElementById('recentSalesTable') ? document.getElementById('recentSalesTable').querySelector('tbody') : null,
+        chartRange: document.getElementById('chartRange'),
+        productsTable: document.getElementById('productsTable'),
+        salesTable: document.getElementById('salesTable'),
+        expensesTable: document.getElementById('expensesTable'),
+        receivablesTable: document.getElementById('receivablesTable'),
+        modalContainer: document.getElementById('appModal'),
+        modalTitle: document.getElementById('modalTitle'),
+        modalBody: document.getElementById('modalBody'),
+        modalSaveBtn: document.getElementById('modalSaveBtn'),
+        modalCancelBtn: document.getElementById('modalCancelBtn'),
+        modalCloseBtn: document.getElementById('modalCloseBtn'),
+        loadingOverlay: document.getElementById('loadingOverlay'),
+        lastBackup: document.getElementById('lastBackup'),
+        nextBackup: document.getElementById('nextBackup'),
+        dataSize: document.getElementById('dataSize'),
+        backupNowBtn: document.getElementById('backupNowBtn'),
+        restoreBackupBtn: document.getElementById('restoreBackupBtn'),
+        downloadBackupBtn: document.getElementById('downloadBackupBtn'),
+        backupFrequency: document.getElementById('backupFrequency'),
+        backupNotifications: document.getElementById('backupNotifications'),
+        settingsTabs: document.querySelectorAll('.tab-btn'),
+        companySettingsForm: document.getElementById('companySettingsForm'),
+        salesSettingsForm: document.getElementById('salesSettingsForm'),
+        notificationsSettingsForm: document.getElementById('notificationsSettingsForm'),
+        addUserBtn: document.getElementById('addUserBtn'),
+        cashClosingDate: document.getElementById('cashClosingDate'),
+        cashClosingInitialValue: document.getElementById('cashClosingInitialValue'),
+        generateClosingBtn: document.getElementById('generateClosingBtn'),
+        closingResult: document.getElementById('closingResult'),
+        closingDateResult: document.getElementById('closingDateResult'),
+        closingCashSales: document.getElementById('closingCashSales'),
+        closingCardSales: document.getElementById('closingCardSales'),
+        closingTotalSales: document.getElementById('closingTotalSales'),
+        closingInitialValue: document.getElementById('closingInitialValue'),
+        closingExpenses: document.getElementById('closingExpenses'),
+        closingExpectedCash: document.getElementById('closingExpectedCash'),
+        // NOVO: Elementos para Gerenciamento de Mesas
+        addTableForm: document.getElementById('addTableForm'),
+        tableNameInput: document.getElementById('tableNameInput'),
+        tablesList: document.getElementById('tablesList'),
+    };
 
-let tables = [
-    { id: 1, number: 1, capacity: 4, description: "Mesa perto do balcão", status: "free", orders: [] },
-    { id: 2, number: 2, capacity: 6, description: "Mesa central", status: "free", orders: [] },
-    { id: 3, number: 3, capacity: 2, description: "Mesa de casal", status: "free", orders: [] },
-    { id: 4, number: 4, capacity: 8, description: "Mesa grande", status: "free", orders: [] }
-];
+    let onSaveCallback = null;
+    let currentModalData = null;
 
-let receivables = [
-    { id: 1, client: "João Silva", totalAmount: 150.00, receivedAmount: 0.00, dueDate: "2023-11-10", status: "pending", sales: [] },
-    { id: 2, client: "Maria Santos", totalAmount: 89.70, receivedAmount: 50.00, dueDate: "2023-11-05", status: "partial", sales: [] },
-    { id: 3, client: "Carlos Oliveira", totalAmount: 230.50, receivedAmount: 230.50, dueDate: "2023-10-20", status: "paid", sales: [] }
-];
+    // --- FUNÇÕES UTILITÁRIAS ---
+    const parseFormattedNumber = (value) => {
+        if (typeof value !== 'string' || value.trim() === '') return 0;
+        return parseFloat(value.replace(/\./g, '').replace(',', '.'));
+    };
 
-let expenses = [
-    { id: 1, description: "Compra de bebidas", category: "Estoque", amount: 1250.00, date: "2023-10-20" },
-    { id: 2, description: "Pagamento de funcionários", category: "Folha de Pagamento", amount: 3200.00, date: "2023-10-05" },
-    { id: 3, description: "Aluguel do espaço", category: "Despesas Fixas", amount: 1800.00, date: "2023-10-01" },
-    { id: 4, description: "Conta de luz", category: "Utilidades", amount: 350.00, date: "2023-10-15" }
-];
+    const formatCurrency = (value) => {
+        if (typeof value !== 'number') value = 0;
+        return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+    };
 
-let expenseCategories = ["Estoque", "Folha de Pagamento", "Despesas Fixas", "Utilidades", "Manutenção", "Outros"];
+    const formatDate = (dateString) => {
+        const date = new Date(dateString);
+        const userTimezoneOffset = date.getTimezoneOffset() * 60000;
+        return new Date(date.getTime() + userTimezoneOffset).toLocaleDateString('pt-BR');
+    };
 
-let currentSale = [];
-let selectedPaymentMethod = null;
-let cardFee = 0;
-let currentLowStockFilter = 'all';
-let currentSalesFilter = 'all';
-let backupInterval = null;
+    const formatDateTime = (dateString) => {
+        const date = new Date(dateString);
+        return date.toLocaleString('pt-BR');
+    };
 
-// Funções para salvar e carregar dados do localStorage
-function saveDataToLocalStorage() {
-    localStorage.setItem('conteinerbeer_products', JSON.stringify(products));
-    localStorage.setItem('conteinerbeer_categories', JSON.stringify(categories));
-    localStorage.setItem('conteinerbeer_sales', JSON.stringify(sales));
-    localStorage.setItem('conteinerbeer_tables', JSON.stringify(tables));
-    localStorage.setItem('conteinerbeer_receivables', JSON.stringify(receivables));
-    localStorage.setItem('conteinerbeer_expenses', JSON.stringify(expenses));
-    localStorage.setItem('conteinerbeer_expense_categories', JSON.stringify(expenseCategories));
-    localStorage.setItem('conteinerbeer_last_save', new Date().toISOString());
-    
-    // Atualizar o indicador de último backup
-    updateLastBackupTime();
-}
+    const getTodayDate = () => new Date().toISOString().slice(0, 10);
 
-function loadDataFromLocalStorage() {
-    const savedProducts = localStorage.getItem('conteinerbeer_products');
-    const savedCategories = localStorage.getItem('conteinerbeer_categories');
-    const savedSales = localStorage.getItem('conteinerbeer_sales');
-    const savedTables = localStorage.getItem('conteinerbeer_tables');
-    const savedReceivables = localStorage.getItem('conteinerbeer_receivables');
-    const savedExpenses = localStorage.getItem('conteinerbeer_expenses');
-    const savedExpenseCategories = localStorage.getItem('conteinerbeer_expense_categories');
-    
-    if (savedProducts) products = JSON.parse(savedProducts);
-    if (savedCategories) categories = JSON.parse(savedCategories);
-    if (savedSales) sales = JSON.parse(savedSales);
-    if (savedTables) tables = JSON.parse(savedTables);
-    if (savedReceivables) receivables = JSON.parse(savedReceivables);
-    if (savedExpenses) expenses = JSON.parse(savedExpenses);
-    if (savedExpenseCategories) expenseCategories = JSON.parse(savedExpenseCategories);
-    
-    // Atualizar o indicador de último backup
-    updateLastBackupTime();
-}
+    const showLoading = () => {
+        elements.loadingOverlay.classList.remove('hidden');
+    };
 
-// Atualizar o indicador de último backup
-function updateLastBackupTime() {
-    const lastSave = localStorage.getItem('conteinerbeer_last_save');
-    const lastBackupElement = document.getElementById('last-backup-time');
-    
-    if (lastBackupElement) {
-        if (lastSave) {
-            const lastSaveDate = new Date(lastSave);
-            lastBackupElement.textContent = `Último backup: ${formatDateTime(lastSaveDate)}`;
+    const hideLoading = () => {
+        setTimeout(() => {
+            elements.loadingOverlay.classList.add('hidden');
+        }, 300);
+    };
+
+    const showNotification = (title, message, type = 'info') => {
+        const notification = {
+            id: Date.now(),
+            title,
+            message,
+            type,
+            timestamp: new Date(),
+            read: false
+        };
+        
+        DB.notifications.unshift(notification);
+        updateNotificationsUI();
+        saveDB();
+        
+        if (DB.settings.notifications.notificationSound !== 'none') {
+            playNotificationSound();
+        }
+    };
+
+    const playNotificationSound = () => {
+        const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF5fdJivrJBhNjVgodDbq2EcBSt5r9rJfUj/AE6Yx9KdZEj/AFyf0sWQY1D/AGWl2LqJZ1j/AHCs3rOCZ2D/AHu047CBaGj/AIa56Kp/aHD/AJDD7qd+aXj/AJfJ9KZ+anj/AKDP+6V+a3z/AKfU/6R+bID/ALHZBKJ+bYD/ALjeB6B+boD/AMThDJ5+b4D/AMvkEZ1+cID/ANHnF5t+cYD/ANjqHJp+coD/ANztH5h+c4D/AODwI5Z+dID/AOPzJpR+dYD/AOb2KZJ+doD/AOz5LJB+d4D/APD8Lo5+eID/APQAMYx+eYD/APcCNIp9eoD/APoEOYh9e4D/AP0GPIZ9fID/AP8I');
+        audio.volume = 0.3;
+        audio.play().catch(() => {});
+    };
+
+    const updateNotificationsUI = () => {
+        const unreadCount = DB.notifications.filter(n => !n.read).length;
+        
+        if (unreadCount > 0) {
+            elements.notificationCount.textContent = unreadCount;
+            elements.notificationCount.classList.remove('hidden');
         } else {
-            lastBackupElement.textContent = 'Nenhum backup realizado';
+            elements.notificationCount.classList.add('hidden');
         }
-    }
-}
-
-// Formatar data e hora
-function formatDateTime(date) {
-    return date.toLocaleString('pt-BR', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-    });
-}
-
-// Iniciar backup automático a cada 30 minutos
-function startAutoBackup() {
-    if (backupInterval) clearInterval(backupInterval);
-    
-    backupInterval = setInterval(() => {
-        saveDataToLocalStorage();
-        console.log('Backup automático realizado às', new Date().toLocaleTimeString('pt-BR'));
-    }, 30 * 60 * 1000); // 30 minutos
-}
-
-// Exportar dados para JSON
-function exportData() {
-    const data = {
-        products: products,
-        categories: categories,
-        sales: sales,
-        tables: tables,
-        receivables: receivables,
-        expenses: expenses,
-        expenseCategories: expenseCategories,
-        exportDate: new Date().toISOString(),
-        system: "Conteiner Beer"
-    };
-    
-    const dataStr = JSON.stringify(data, null, 2);
-    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
-    
-    const exportFileDefaultName = `conteinerbeer-backup-${new Date().toISOString().split('T')[0]}.json`;
-    
-    const linkElement = document.createElement('a');
-    linkElement.setAttribute('href', dataUri);
-    linkElement.setAttribute('download', exportFileDefaultName);
-    linkElement.click();
-    
-    // Atualizar o indicador de último backup
-    saveDataToLocalStorage();
-}
-
-// Importar dados de JSON
-function importData(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-    
-    // Verificar se é um arquivo JSON
-    if (!file.name.endsWith('.json')) {
-        alert('Por favor, selecione um arquivo JSON.');
-        return;
-    }
-    
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        try {
-            const data = JSON.parse(e.target.result);
-            
-            // Verificar se é um arquivo válido do Conteiner Beer
-            if (!data.products || !data.categories || !data.sales) {
-                alert('Arquivo inválido. Este não parece ser um backup do Conteiner Beer.');
-                return;
-            }
-            
-            if (confirm('Isso substituirá todos os dados atuais. Tem certeza?')) {
-                if (data.products) products = data.products;
-                if (data.categories) categories = data.categories;
-                if (data.sales) sales = data.sales;
-                if (data.tables) tables = data.tables;
-                if (data.receivables) receivables = data.receivables;
-                if (data.expenses) expenses = data.expenses;
-                if (data.expenseCategories) expenseCategories = data.expenseCategories;
+        
+        if (elements.notificationsList) {
+            elements.notificationsList.innerHTML = '';
+            DB.notifications.slice(0, 10).forEach(notification => {
+                const notificationEl = document.createElement('div');
+                notificationEl.className = `notification-item ${notification.read ? '' : 'unread'}`;
+                notificationEl.innerHTML = `
+                    <div class="notification-icon">
+                        <i class="fas fa-${getNotificationIcon(notification.type)}"></i>
+                    </div>
+                    <div class="notification-content">
+                        <div class="notification-title">${notification.title}</div>
+                        <div class="notification-message">${notification.message}</div>
+                        <div class="notification-time">${formatDateTime(notification.timestamp)}</div>
+                    </div>
+                `;
                 
-                // Atualizar a interface
-                updateProductsTable();
-                updateDashboard();
-                updateProductSelects();
-                updateQuickSalesStock();
-                updateTablesGrid();
-                updateReceivablesTable();
-                updateExpensesTable();
+                notificationEl.addEventListener('click', () => {
+                    notification.read = true;
+                    updateNotificationsUI();
+                    saveDB();
+                });
                 
-                // Salvar no localStorage também
-                saveDataToLocalStorage();
-                
-                alert('Dados importados com sucesso!');
-            }
-        } catch (error) {
-            alert('Erro ao importar arquivo. O arquivo pode estar corrompido ou em formato inválido.');
-            console.error('Erro na importação:', error);
+                elements.notificationsList.appendChild(notificationEl);
+            });
         }
     };
-    reader.readAsText(file);
-}
 
-// Função para calcular vendas do dia
-function getTodaySales() {
-    const today = new Date().toISOString().split('T')[0];
-    return sales.filter(sale => sale.date === today);
-}
+    const getNotificationIcon = (type) => {
+        switch (type) {
+            case 'success': return 'check-circle';
+            case 'warning': return 'exclamation-triangle';
+            case 'error': return 'exclamation-circle';
+            default: return 'info-circle';
+        }
+    };
 
-// Função para mostrar resumo das vendas do dia
-function showDailySalesSummary() {
-    const todaySales = getTodaySales();
-    const totalSales = todaySales.reduce((sum, sale) => sum + (sale.quantity * sale.price), 0);
-    const salesCount = todaySales.length;
-    
-    document.getElementById('daily-sales-count').textContent = salesCount;
-    document.getElementById('daily-sales-total').textContent = `R$ ${totalSales.toFixed(2)}`;
-    
-    const summaryElement = document.getElementById('daily-sales-summary');
-    summaryElement.style.display = 'block';
-    
-    // Ocultar o resumo após 5 segundos
-    setTimeout(() => {
-        summaryElement.style.display = 'none';
-    }, 5000);
-}
+    const markAllNotificationsAsRead = () => {
+        DB.notifications.forEach(notification => {
+            notification.read = true;
+        });
+        updateNotificationsUI();
+        saveDB();
+    };
 
-// Função para limpar vendas do dia
-function clearTodaySales() {
-    const today = new Date().toISOString().split('T')[0];
-    const todaySalesCount = sales.filter(sale => sale.date === today).length;
-    
-    if (todaySalesCount === 0) {
-        alert('Não há vendas registradas hoje!');
-        return;
-    }
-    
-    if (confirm(`Tem certeza que deseja limpar as ${todaySalesCount} vendas de hoje? Esta ação não pode ser desfeita!`)) {
-        // Manter apenas vendas de outros dias
-        sales = sales.filter(sale => sale.date !== today);
-        
-        // Salvar dados
-        saveDataToLocalStorage();
-        
-        // Atualizar histórico se estiver visível
-        if (document.getElementById('sales-modal').style.display === 'block') {
-            updateSalesHistory();
+    // --- PERSISTÊNCIA DE DADOS ---
+    const saveDB = () => {
+        localStorage.setItem('conteinerBeerDB', JSON.stringify(DB));
+        localStorage.setItem('conteinerBeerDB_lastUpdate', new Date().toISOString());
+        updateDataSize();
+    };
+
+    const loadDB = () => {
+        const data = JSON.parse(localStorage.getItem('conteinerBeerDB'));
+        if (data) {
+            Object.keys(DB).forEach(key => {
+                if (data[key] !== undefined) {
+                    if (key === 'settings' && data[key]) {
+                        Object.keys(DB.settings).forEach(settingKey => {
+                            if (data.settings[settingKey]) {
+                                DB.settings[settingKey] = { 
+                                    ...DB.settings[settingKey], 
+                                    ...data.settings[settingKey] 
+                                };
+                            }
+                        });
+                    } else {
+                        DB[key] = data[key];
+                    }
+                }
+            });
+        }
+        updateDataSize();
+    };
+
+    const updateDataSize = () => {
+        const data = JSON.stringify(DB);
+        const sizeInKB = (new Blob([data]).size / 1024).toFixed(2);
+        if (elements.dataSize) {
+            elements.dataSize.textContent = `${sizeInKB} KB`;
+        }
+    };
+
+    // --- SISTEMA DE BACKUP ---
+    const setupBackupSystem = () => {
+        const frequency = DB.settings.backup.frequency;
+        setupBackupInterval(frequency);
+        updateBackupUI();
+    };
+
+    const setupBackupInterval = (minutes) => {
+        if (backupInterval) {
+            clearInterval(backupInterval);
+        }
+        backupInterval = setInterval(createBackup, minutes * 60 * 1000);
+        updateNextBackupTime(minutes);
+    };
+
+    const createBackup = () => {
+        localStorage.setItem('conteinerBeerDB_backup', JSON.stringify(DB));
+        localStorage.setItem('conteinerBeerDB_backupTime', new Date().toISOString());
+        updateBackupUI();
+        if (DB.settings.backup.notifyOnBackup) {
+            showNotification('Backup Realizado', 'Backup dos dados realizado com sucesso.', 'success');
+        }
+        console.log('Backup automático realizado:', new Date().toLocaleString('pt-BR'));
+    };
+
+    const restoreBackup = () => {
+        if (confirm('Tem certeza que deseja restaurar o último backup? Os dados atuais serão substituídos.')) {
+            const backupData = JSON.parse(localStorage.getItem('conteinerBeerDB_backup'));
+            if (backupData) {
+                Object.keys(DB).forEach(key => {
+                    if (backupData[key] !== undefined) {
+                        DB[key] = backupData[key];
+                    }
+                });
+                saveDB();
+                renderAll();
+                showNotification('Backup Restaurado', 'Dados restaurados do backup com sucesso.', 'success');
+            } else {
+                alert('Nenhum backup encontrado para restaurar.');
+            }
+        }
+    };
+
+    const downloadBackup = () => {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(DB));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("download", `conteinerbeer_backup_${new Date().toISOString().slice(0, 10)}.json`);
+        document.body.appendChild(downloadAnchorNode);
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+        showNotification('Download de Backup', 'Download do arquivo de backup realizado com sucesso.', 'success');
+    };
+
+    const updateBackupUI = () => {
+        const backupTime = localStorage.getItem('conteinerBeerDB_backupTime');
+        if (backupTime && elements.lastBackup) {
+            elements.lastBackup.textContent = new Date(backupTime).toLocaleString('pt-BR');
+        }
+    };
+
+    const updateNextBackupTime = (minutes) => {
+        const nextBackup = new Date(Date.now() + minutes * 60 * 1000);
+        if (elements.nextBackup) {
+            elements.nextBackup.textContent = nextBackup.toLocaleTimeString('pt-BR');
+        }
+    };
+
+    // --- SISTEMA DE LOGIN E SEGURANÇA ---
+    const setupLoginSystem = () => {
+        const savedUser = localStorage.getItem('conteinerBeer_currentUser');
+        if (savedUser) {
+            currentUser = JSON.parse(savedUser);
+            showMainSystem();
+        } else {
+            showLoginScreen();
+        }
+    };
+
+    const showLoginScreen = () => {
+        if (elements.loginScreen) elements.loginScreen.classList.remove('hidden');
+        if (elements.mainSystem) elements.mainSystem.classList.add('hidden');
+    };
+
+    const showMainSystem = () => {
+        if (elements.loginScreen) elements.loginScreen.classList.add('hidden');
+        if (elements.mainSystem) elements.mainSystem.classList.remove('hidden');
+        if (elements.userName) elements.userName.textContent = currentUser.name;
+        initializeMainSystem();
+    };
+
+    const login = (username, password) => {
+        const user = DB.users.find(u => u.username === username && u.password === password);
+        if (user) {
+            currentUser = user;
+            localStorage.setItem('conteinerBeer_currentUser', JSON.stringify(user));
+            showMainSystem();
+            return true;
+        }
+        return false;
+    };
+
+    const logout = () => {
+        currentUser = null;
+        localStorage.removeItem('conteinerBeer_currentUser');
+        showLoginScreen();
+    };
+
+    // --- SISTEMA PRINCIPAL ---
+    const initializeMainSystem = () => {
+        loadDB();
+        setupBackupSystem();
+        setupEventListeners();
+        renderAll();
+        setupCharts();
+        checkInitialNotifications();
+    };
+
+    const checkInitialNotifications = () => {
+        const lowStockItems = DB.products.filter(p => p.quantity <= p.lowStockThreshold);
+        if (lowStockItems.length > 0 && DB.settings.notifications.notifyLowStock) {
+            showNotification('Estoque Baixo', `${lowStockItems.length} produtos com estoque baixo.`, 'warning');
         }
         
-        // Atualizar dashboard
-        updateDashboard();
-        
-        // Mostrar resumo
-        showDailySalesSummary();
-        
-        alert(`Vendas do dia limpas com sucesso! ${todaySalesCount} vendas removidas.`);
-    }
-}
-
-// Inicialização
-document.addEventListener('DOMContentLoaded', function() {
-    // Carregar dados salvos
-    loadDataFromLocalStorage();
-    
-    // Iniciar backup automático
-    startAutoBackup();
-    
-    // Atualizar a interface
-    updateProductsTable();
-    updateDashboard();
-    updateProductSelects();
-    updateQuickSalesStock();
-    updateTablesGrid();
-    updateReceivablesTable();
-    updateExpensesTable();
-    
-    // Configurar event listeners
-    setupEventListeners();
-    
-    // Definir data atual para campos de data
-    const today = new Date().toISOString().split('T')[0];
-    const expenseDate = document.getElementById('expense-date');
-    const paymentDate = document.getElementById('payment-date');
-    const receivableDueDate = document.getElementById('receivable-due-date');
-    
-    if (expenseDate) expenseDate.value = today;
-    if (paymentDate) paymentDate.value = today;
-    if (receivableDueDate) receivableDueDate.value = today;
-});
-
-// Atualiza a tabela de produtos
-function updateProductsTable() {
-    const tableBody = document.getElementById('products-table-body');
-    const modalTableBody = document.getElementById('modal-products-table-body');
-    let tableContent = '';
-    let modalTableContent = '';
-    
-    products.forEach(product => {
-        const status = product.quantity === 0 ? 'Esgotado' : 
-                      product.quantity <= product.minStock ? 'Estoque Baixo' : 'Disponível';
-        
-        const statusClass = product.quantity === 0 ? 'alert' : 
-                           product.quantity <= product.minStock ? 'warning' : '';
-        
-        tableContent += `
-            <tr class="${statusClass}">
-                <td>${product.name}</td>
-                <td>${product.category}</td>
-                <td>${product.quantity}</td>
-                <td>R$ ${product.price.toFixed(2)}</td>
-                <td>${status}</td>
-                <td>
-                    <button class="action-btn edit-product" data-id="${product.id}"><i class="fas fa-edit"></i></button>
-                    <button class="action-btn delete-btn delete-product" data-id="${product.id}"><i class="fas fa-trash"></i></button>
-                </td>
-            </tr>
-        `;
-        
-        modalTableContent += `
-            <tr>
-                <td>${product.name}</td>
-                <td>${product.category}</td>
-                <td>${product.quantity}</td>
-                <td>R$ ${product.price.toFixed(2)}</td>
-                <td>
-                    <button class="action-btn edit-product" data-id="${product.id}"><i class="fas fa-edit"></i></button>
-                    <button class="action-btn delete-btn delete-product" data-id="${product.id}"><i class="fas fa-trash"></i></button>
-                </td>
-            </tr>
-        `;
-    });
-    
-    if (tableBody) tableBody.innerHTML = tableContent;
-    if (modalTableBody) modalTableBody.innerHTML = modalTableContent;
-    
-    // Adicionar event listeners aos botões de editar e excluir
-    document.querySelectorAll('.edit-product').forEach(button => {
-        button.addEventListener('click', (e) => {
-            const productId = parseInt(e.target.closest('button').getAttribute('data-id'));
-            editProduct(productId);
-        });
-    });
-    
-    document.querySelectorAll('.delete-product').forEach(button => {
-        button.addEventListener('click', (e) => {
-            const productId = parseInt(e.target.closest('button').getAttribute('data-id'));
-            deleteProduct(productId);
-        });
-    });
-    
-    // Atualizar selects de produtos
-    updateProductSelects();
-    updateQuickSalesStock();
-    
-    // Salvar dados
-    saveDataToLocalStorage();
-}
-
-// Atualiza o estoque nos botões de venda rápida
-function updateQuickSalesStock() {
-    const heineken = products.find(p => p.name === "Cerveja Heineken");
-    const smirnoff = products.find(p => p.name === "Vodka Smirnoff");
-    const vinho = products.find(p => p.name.includes("Vinho Tinto"));
-    const whisky = products.find(p => p.name.includes("Whisky Johnnie"));
-    
-    if (heineken && document.getElementById('stock-heineken')) document.getElementById('stock-heineken').textContent = heineken.quantity;
-    if (smirnoff && document.getElementById('stock-smirnoff')) document.getElementById('stock-smirnoff').textContent = smirnoff.quantity;
-    if (vinho && document.getElementById('stock-vinho')) document.getElementById('stock-vinho').textContent = vinho.quantity;
-    if (whisky && document.getElementById('stock-whisky')) document.getElementById('stock-whisky').textContent = whisky.quantity;
-}
-
-// Atualiza o dashboard
-function updateDashboard() {
-    const totalProducts = products.length;
-    const totalStock = products.reduce((sum, product) => sum + product.quantity, 0);
-    
-    // Calcular vendas de hoje
-    const today = new Date().toISOString().split('T')[0];
-    const salesToday = sales
-        .filter(sale => sale.date === today)
-        .reduce((sum, sale) => sum + (sale.quantity * sale.price), 0);
-    
-    // Calcular produtos com estoque baixo
-    const lowStock = products.filter(product => product.quantity <= product.minStock && product.quantity > 0).length;
-    const outOfStock = products.filter(product => product.quantity === 0).length;
-    
-    // Calcular vendas de hoje para o novo card
-    const todaySales = getTodaySales();
-    
-    // Calcular total a receber
-    const totalReceivables = receivables.reduce((sum, rec) => sum + (rec.totalAmount - rec.receivedAmount), 0);
-    
-    // Calcular gastos do mês
-    const currentMonth = new Date().getMonth();
-    const currentYear = new Date().getFullYear();
-    const monthExpenses = expenses
-        .filter(expense => {
-            const expenseDate = new Date(expense.date);
-            return expenseDate.getMonth() === currentMonth && expenseDate.getFullYear() === currentYear;
-        })
-        .reduce((sum, expense) => sum + expense.amount, 0);
-    
-    // Calcular mesas ativas
-    const activeTables = tables.filter(table => table.status !== 'free').length;
-    
-    if (document.getElementById('total-products')) document.getElementById('total-products').textContent = totalProducts;
-    if (document.getElementById('total-stock')) document.getElementById('total-stock').textContent = `${totalStock.toLocaleString()} uni.`;
-    if (document.getElementById('sales-today')) document.getElementById('sales-today').textContent = `R$ ${salesToday.toFixed(2)}`;
-    if (document.getElementById('low-stock')) document.getElementById('low-stock').textContent = lowStock + outOfStock;
-    if (document.getElementById('today-sales-count')) document.getElementById('today-sales-count').textContent = `${todaySales.length} vendas`;
-    if (document.getElementById('total-receivables')) document.getElementById('total-receivables').textContent = `R$ ${totalReceivables.toFixed(2)}`;
-    if (document.getElementById('month-expenses')) document.getElementById('month-expenses').textContent = `R$ ${monthExpenses.toFixed(2)}`;
-    if (document.getElementById('active-tables')) document.getElementById('active-tables').textContent = activeTables;
-    
-    // Salvar dados
-    saveDataToLocalStorage();
-}
-
-// Atualiza os selects de produtos
-function updateProductSelects() {
-    const saleProductSelect = document.getElementById('sale-product');
-    if (saleProductSelect) {
-        let options = '<option value="">Selecione um produto</option>';
-        
-        products.forEach(product => {
-            if (product.quantity > 0) {
-                options += `<option value="${product.id}" data-price="${product.price}">${product.name} - R$ ${product.price.toFixed(2)} (Estoque: ${product.quantity})</option>`;
+        const today = new Date();
+        const overdueReceivables = DB.receivables.filter(r => {
+            if (r.status === 'Pendente') {
+                const dueDate = new Date(r.dueDate);
+                return dueDate < today;
             }
+            return false;
         });
         
-        saleProductSelect.innerHTML = options;
-    }
-    
-    // Atualizar select de categorias
-    const categorySelect = document.getElementById('productCategory');
-    if (categorySelect) {
-        let categoryOptions = '<option value="">Selecione uma categoria</option>';
-        
-        categories.forEach(category => {
-            categoryOptions += `<option value="${category}">${category}</option>`;
-        });
-        
-        categorySelect.innerHTML = categoryOptions;
-    }
-    
-    // Atualizar lista de categorias
-    const categoriesList = document.getElementById('categories-list');
-    if (categoriesList) {
-        let categoriesContent = '';
-        
-        categories.forEach(category => {
-            categoriesContent += `<li>${category} <button class="action-btn delete-btn delete-category" data-category="${category}"><i class="fas fa-trash"></i></button></li>`;
-        });
-        
-        categoriesList.innerHTML = categoriesContent;
-        
-        // Adicionar event listeners aos botões de excluir categoria
-        document.querySelectorAll('.delete-category').forEach(button => {
-            button.addEventListener('click', (e) => {
-                const category = e.target.closest('button').getAttribute('data-category');
-                deleteCategory(category);
-            });
-        });
-    }
-    
-    // Atualizar select de mesas
-    const tableSelect = document.getElementById('sale-table');
-    if (tableSelect) {
-        let tableOptions = '<option value="">Selecione uma mesa</option>';
-        
-        tables.forEach(table => {
-            if (table.status === 'occupied') {
-                tableOptions += `<option value="${table.id}">Mesa ${table.number} (Ocupada)</option>`;
-            }
-        });
-        
-        tableSelect.innerHTML = tableOptions;
-    }
-    
-    // Atualizar select de contas a receber
-    const receivableSelect = document.getElementById('receivable-select');
-    if (receivableSelect) {
-        let receivableOptions = '<option value="">Selecione uma conta</option>';
-        
-        receivables.forEach(receivable => {
-            if (receivable.status !== 'paid') {
-                const pendingAmount = receivable.totalAmount - receivable.receivedAmount;
-                receivableOptions += `<option value="${receivable.id}" data-pending="${pendingAmount}">${receivable.client} - R$ ${pendingAmount.toFixed(2)}</option>`;
-            }
-        });
-        
-        receivableSelect.innerHTML = receivableOptions;
-    }
-    
-    // Atualizar select de categorias de gastos
-    const expenseCategorySelect = document.getElementById('expense-category');
-    if (expenseCategorySelect) {
-        let expenseCategoryOptions = '<option value="">Selecione uma categoria</option>';
-        
-        expenseCategories.forEach(category => {
-            expenseCategoryOptions += `<option value="${category}">${category}</option>`;
-        });
-        
-        expenseCategorySelect.innerHTML = expenseCategoryOptions;
-    }
-    
-    // Atualizar lista de categorias de gastos
-    const expenseCategoriesList = document.getElementById('expense-categories-list');
-    if (expenseCategoriesList) {
-        let expenseCategoriesContent = '';
-        
-        expenseCategories.forEach(category => {
-            expenseCategoriesContent += `<li>${category} <button class="action-btn delete-btn delete-expense-category" data-category="${category}"><i class="fas fa-trash"></i></button></li>`;
-        });
-        
-        expenseCategoriesList.innerHTML = expenseCategoriesContent;
-        
-        // Adicionar event listeners aos botões de excluir categoria de gastos
-        document.querySelectorAll('.delete-expense-category').forEach(button => {
-            button.addEventListener('click', (e) => {
-                const category = e.target.closest('button').getAttribute('data-category');
-                deleteExpenseCategory(category);
-            });
-        });
-    }
-}
+        if (overdueReceivables.length > 0 && DB.settings.notifications.notifyOverdue) {
+            showNotification('Contas Vencidas', `${overdueReceivables.length} contas vencidas.`, 'error');
+        }
+    };
 
-// Atualiza a grade de mesas
-function updateTablesGrid() {
-    const tablesGrid = document.getElementById('tables-grid');
-    const tablesManagement = document.getElementById('tables-management');
-    
-    if (!tablesGrid && !tablesManagement) return;
-    
-    let tablesContent = '';
-    let managementContent = '';
-    
-    tables.forEach(table => {
-        const statusText = table.status === 'free' ? 'Livre' : 
-                          table.status === 'occupied' ? 'Ocupada' : 'Reservada';
-        
-        const statusClass = table.status === 'free' ? 'status-free' : 
-                           table.status === 'occupied' ? 'status-occupied' : 'status-reserved';
-        
-        // Calcular total da mesa se estiver ocupada
-        let tableTotal = 0;
-        if (table.status === 'occupied' && table.orders.length > 0) {
-            tableTotal = table.orders.reduce((sum, order) => sum + (order.price * order.quantity), 0);
+    const setupEventListeners = () => {
+        if (elements.logoutBtn) {
+            elements.logoutBtn.addEventListener('click', logout);
         }
         
-        tablesContent += `
-            <div class="table-item ${table.status !== 'free' ? 'active' : ''}" data-id="${table.id}">
-                <div class="table-number">Mesa ${table.number}</div>
-                <div class="table-status ${statusClass}">${statusText}</div>
-                <div class="table-capacity">${table.capacity} lugares</div>
-                <div class="table-description">${table.description || ''}</div>
-                ${table.status === 'occupied' ? `<div class="table-total">Total: R$ ${tableTotal.toFixed(2)}</div>` : ''}
+        if (elements.sidebarToggle) {
+            elements.sidebarToggle.addEventListener('click', () => {
+                elements.sidebar.classList.toggle('collapsed');
+            });
+        }
+        
+        if (elements.navLinks) {
+            elements.navLinks.forEach(link => {
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    elements.navLinks.forEach(l => l.classList.remove('active'));
+                    link.classList.add('active');
+                    
+                    const target = link.dataset.target;
+                    document.querySelectorAll('.content-section').forEach(section => {
+                        section.classList.remove('active');
+                    });
+                    document.getElementById(target).classList.add('active');
+                    
+                    if (elements.pageTitle) {
+                        elements.pageTitle.textContent = link.querySelector('span').textContent;
+                    }
+                    
+                    if (elements.notificationsPanel) {
+                        elements.notificationsPanel.classList.add('hidden');
+                    }
+                });
+            });
+        }
+        
+        if (elements.themeToggle) {
+            elements.themeToggle.addEventListener('click', () => {
+                document.body.classList.toggle('light-theme');
+                const isLightTheme = document.body.classList.contains('light-theme');
+                elements.themeToggle.innerHTML = isLightTheme ? 
+                    '<i class="fas fa-sun"></i>' : 
+                    '<i class="fas fa-moon"></i>';
+                localStorage.setItem('conteinerBeer_theme', isLightTheme ? 'light' : 'dark');
+            });
+        }
+        
+        if (elements.notificationsBtn) {
+            elements.notificationsBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                elements.notificationsPanel.classList.toggle('hidden');
+            });
+        }
+        
+        if (elements.clearNotificationsBtn) {
+            elements.clearNotificationsBtn.addEventListener('click', markAllNotificationsAsRead);
+        }
+        
+        document.addEventListener('click', (e) => {
+            if (elements.notificationsPanel && !elements.notificationsPanel.contains(e.target) && e.target !== elements.notificationsBtn) {
+                elements.notificationsPanel.classList.add('hidden');
+            }
+        });
+        
+        if (elements.quickSaleBtn) {
+            elements.quickSaleBtn.addEventListener('click', showSaleModal);
+        }
+        
+        if (elements.clearSalesBtn) {
+            elements.clearSalesBtn.addEventListener('click', clearTodaySales);
+        }
+        
+        if (elements.backupNowBtn) elements.backupNowBtn.addEventListener('click', createBackup);
+        if (elements.restoreBackupBtn) elements.restoreBackupBtn.addEventListener('click', restoreBackup);
+        if (elements.downloadBackupBtn) elements.downloadBackupBtn.addEventListener('click', downloadBackup);
+        
+        if (elements.backupFrequency) {
+            elements.backupFrequency.addEventListener('change', (e) => {
+                const frequency = parseInt(e.target.value);
+                DB.settings.backup.frequency = frequency;
+                setupBackupInterval(frequency);
+                saveDB();
+            });
+        }
+        
+        if (elements.backupNotifications) {
+            elements.backupNotifications.addEventListener('change', (e) => {
+                DB.settings.backup.notifyOnBackup = e.target.checked;
+                saveDB();
+            });
+        }
+        
+        if (elements.settingsTabs) {
+            elements.settingsTabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    elements.settingsTabs.forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    const tabId = `${tab.dataset.tab}-tab`;
+                    document.querySelectorAll('.tab-pane').forEach(pane => {
+                        pane.classList.remove('active');
+                    });
+                    document.getElementById(tabId).classList.add('active');
+                });
+            });
+        }
+        
+        if (elements.companySettingsForm) {
+            elements.companySettingsForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                DB.settings.company.name = document.getElementById('companyName').value;
+                DB.settings.company.address = document.getElementById('companyAddress').value;
+                DB.settings.company.phone = document.getElementById('companyPhone').value;
+                DB.settings.company.email = document.getElementById('companyEmail').value;
+                saveDB();
+                showNotification('Configurações Salvas', 'Configurações da empresa atualizadas.', 'success');
+            });
+        }
+        
+        if (elements.salesSettingsForm) {
+            elements.salesSettingsForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                DB.settings.sales.defaultPaymentMethod = document.getElementById('defaultPaymentMethod').value;
+                DB.settings.sales.taxPercentage = parseFloat(document.getElementById('taxPercentage').value);
+                DB.settings.sales.enableStockControl = document.getElementById('enableStockControl').checked;
+                DB.settings.sales.enableLowStockAlert = document.getElementById('enableLowStockAlert').checked;
+                saveDB();
+                showNotification('Configurações Salvas', 'Configurações de vendas atualizadas.', 'success');
+            });
+        }
+        
+        if (elements.notificationsSettingsForm) {
+            elements.notificationsSettingsForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                DB.settings.notifications.notifyLowStock = document.getElementById('notifyLowStock').checked;
+                DB.settings.notifications.notifyOverdue = document.getElementById('notifyOverdue').checked;
+                DB.settings.notifications.notifyDailySales = document.getElementById('notifyDailySales').checked;
+                DB.settings.notifications.notificationSound = document.getElementById('notificationSound').value;
+                saveDB();
+                showNotification('Configurações Salvas', 'Configurações de notificações atualizadas.', 'success');
+            });
+        }
+        
+        if (elements.addUserBtn) {
+            elements.addUserBtn.addEventListener('click', () => showUserModal());
+        }
+        
+        if (elements.modalCancelBtn && elements.modalCloseBtn) {
+            [elements.modalCancelBtn, elements.modalCloseBtn].forEach(btn => btn.addEventListener('click', closeModal));
+        }
+        
+        if (elements.modalContainer) {
+            elements.modalContainer.addEventListener('click', (e) => {
+                if (e.target === elements.modalContainer) closeModal();
+            });
+        }
+        
+        if (elements.modalSaveBtn) {
+            elements.modalSaveBtn.addEventListener('click', () => {
+                if (onSaveCallback && onSaveCallback()) closeModal();
+            });
+        }
+        
+        document.querySelector('main').addEventListener('click', (e) => {
+            const target = e.target.closest('button');
+            if (!target) return;
+
+            const id = target.dataset.id;
+            
+            if (target.classList.contains('btn-edit')) showProductModal(id);
+            
+            if (target.classList.contains('btn-delete')) {
+                if (confirm("Tem certeza que deseja excluir este produto?")) {
+                    DB.products = DB.products.filter(p => p.id !== Number(id));
+                    saveDB();
+                    renderAll();
+                    showNotification('Produto Excluído', 'Produto excluído com sucesso.', 'success');
+                }
+            }
+            
+            if (target.classList.contains('btn-paid')) {
+                const receivable = DB.receivables.find(r => r.id === Number(id));
+                if (receivable) {
+                    receivable.status = 'Pago';
+                    saveDB();
+                    renderAll();
+                    showNotification('Conta Recebida', 'Conta marcada como paga.', 'success');
+                }
+            }
+
+            if (target.classList.contains('btn-details')) {
+                showSaleDetailsModal(id);
+            }
+
+            // NOVO: Listener para o botão de deletar mesa
+            if (target.classList.contains('btn-delete-table')) {
+                const tableId = Number(target.dataset.id);
+                if (confirm("Tem certeza que deseja remover esta mesa?")) {
+                    DB.tables = DB.tables.filter(table => table.id !== tableId);
+                    saveDB();
+                    renderTables(); // Apenas renderiza a lista de mesas novamente
+                    showNotification('Mesa Removida', 'A mesa foi removida com sucesso.', 'success');
+                }
+            }
+        });
+        
+        document.getElementById('productSearch')?.addEventListener('input', renderProducts);
+        document.getElementById('productFilter')?.addEventListener('change', renderProducts);
+        document.getElementById('salesDateFilter')?.addEventListener('change', renderSales);
+        document.getElementById('salesPaymentFilter')?.addEventListener('change', renderSales);
+        
+        if (elements.chartRange) elements.chartRange.addEventListener('change', setupCharts);
+        
+        const reportTypeCards = document.querySelectorAll('.report-type-card');
+        reportTypeCards.forEach(card => {
+            card.addEventListener('click', () => {
+                reportTypeCards.forEach(c => c.classList.remove('active'));
+                card.classList.add('active');
+                const reportType = card.dataset.report;
+                showReportOptions(reportType);
+            });
+        });
+        
+        document.getElementById('generateReportBtn')?.addEventListener('click', generatePDFReport);
+        
+        if (elements.generateClosingBtn) {
+            elements.generateClosingBtn.addEventListener('click', generateCashClosing);
+        }
+
+        if (elements.cashClosingDate) {
+            elements.cashClosingDate.value = getTodayDate();
+        }
+
+        // NOVO: Listener para o formulário de adicionar mesa
+        if (elements.addTableForm) {
+            elements.addTableForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const tableName = elements.tableNameInput.value.trim();
+                if (tableName) {
+                    const newTable = {
+                        id: Date.now(),
+                        name: tableName,
+                    };
+                    DB.tables.push(newTable);
+                    saveDB();
+                    renderTables(); // Re-renderiza a lista de mesas
+                    elements.tableNameInput.value = ''; // Limpa o campo
+                    showNotification('Mesa Adicionada', `A mesa "${tableName}" foi adicionada.`, 'success');
+                }
+            });
+        }
+    };
+
+    // --- RENDERIZAÇÃO DE DADOS ---
+    // NOVO: Função para renderizar a lista de mesas
+    const renderTables = () => {
+        if (!elements.tablesList) return;
+        elements.tablesList.innerHTML = '';
+        DB.tables.forEach(table => {
+            const tableItem = document.createElement('div');
+            tableItem.className = 'table-list-item';
+            tableItem.innerHTML = `
+                <span>${table.name}</span>
+                <button class="btn btn-sm btn-danger btn-delete-table" data-id="${table.id}">Remover</button>
+            `;
+            elements.tablesList.appendChild(tableItem);
+        });
+    };
+
+    const renderAll = () => {
+        renderDashboard();
+        renderProducts();
+        renderSales();
+        renderExpenses();
+        renderReceivables();
+        renderTables(); // Adicionado para renderizar as mesas
+        updateNotificationsUI();
+        loadSettingsForms();
+    };
+
+    const renderDashboard = () => {
+        const today = getTodayDate();
+        const todaySales = DB.sales.filter(s => s.date.slice(0, 10) === today);
+        const todayRevenue = todaySales.reduce((acc, sale) => acc + sale.total, 0);
+        
+        if (elements.todayRevenue) elements.todayRevenue.textContent = formatCurrency(todayRevenue);
+        if (elements.salesCount) elements.salesCount.textContent = `${todaySales.length} vendas`;
+        
+        const stockValue = DB.products.reduce((acc, p) => acc + (p.quantity * p.costPrice), 0);
+        const stockItems = DB.products.reduce((acc, p) => acc + p.quantity, 0);
+        
+        if (elements.stockValue) elements.stockValue.textContent = formatCurrency(stockValue);
+        if (elements.stockItems) elements.stockItems.textContent = `${stockItems} itens`;
+        
+        const pendingReceivables = DB.receivables.filter(r => r.status === 'Pendente');
+        const receivablesValue = pendingReceivables.reduce((acc, r) => acc + r.value, 0);
+        
+        if (elements.receivablesValue) elements.receivablesValue.textContent = formatCurrency(receivablesValue);
+        if (elements.receivablesCount) elements.receivablesCount.textContent = `${pendingReceivables.length} pendentes`;
+        
+        const lowStockItems = DB.products.filter(p => p.quantity <= p.lowStockThreshold);
+        if (elements.lowStockCount) elements.lowStockCount.textContent = lowStockItems.length;
+        if (elements.lowStockItems) elements.lowStockItems.textContent = lowStockItems.length === 1 ? '1 item crítico' : `${lowStockItems.length} itens críticos`;
+        
+        const now = new Date();
+        const thisMonth = now.getMonth();
+        const thisYear = now.getFullYear();
+        const monthExpenses = DB.expenses.filter(e => {
+            const expenseDate = new Date(e.date);
+            return expenseDate.getMonth() === thisMonth && expenseDate.getFullYear() === thisYear;
+        });
+        
+        const monthExpensesTotal = monthExpenses.reduce((acc, exp) => acc + exp.value, 0);
+        if (elements.monthExpenses) elements.monthExpenses.textContent = formatCurrency(monthExpensesTotal);
+        
+        const daysInMonth = new Date(thisYear, thisMonth + 1, 0).getDate();
+        const dailyAverage = monthExpensesTotal > 0 ? monthExpensesTotal / daysInMonth : 0;
+        if (elements.dailyAverage) elements.dailyAverage.textContent = formatCurrency(dailyAverage);
+        
+        const highestExpense = monthExpenses.length > 0 ? 
+            Math.max(...monthExpenses.map(e => e.value)) : 0;
+        if (elements.highestExpense) elements.highestExpense.textContent = formatCurrency(highestExpense);
+        
+        if (elements.recentSalesTable) {
+            elements.recentSalesTable.innerHTML = '';
+            todaySales.slice(-10).reverse().forEach(sale => {
+                const tr = elements.recentSalesTable.insertRow();
+                tr.innerHTML = `
+                    <td>${new Date(sale.date).toLocaleTimeString('pt-BR')}</td>
+                    <td>${sale.client}</td>
+                    <td>${sale.products.map(p => p.name).join(', ')}</td>
+                    <td>${formatCurrency(sale.total)}</td>
+                    <td>${sale.paymentMethod}</td>
+                `;
+            });
+        }
+    };
+
+    const renderProducts = () => {
+        if (!elements.productsTable) return;
+        
+        elements.productsTable.innerHTML = '';
+        
+        let filteredProducts = [...DB.products];
+        
+        const searchTerm = document.getElementById('productSearch')?.value.toLowerCase() || '';
+        if (searchTerm) {
+            filteredProducts = filteredProducts.filter(p => 
+                p.name.toLowerCase().includes(searchTerm) || 
+                p.id.toString().includes(searchTerm)
+            );
+        }
+        
+        const filterValue = document.getElementById('productFilter')?.value || 'all';
+        if (filterValue === 'low') {
+            filteredProducts = filteredProducts.filter(p => p.quantity <= p.lowStockThreshold);
+        } else if (filterValue === 'out') {
+            filteredProducts = filteredProducts.filter(p => p.quantity === 0);
+        }
+        
+        filteredProducts.forEach(p => {
+            const profit = p.salePrice - p.costPrice;
+            const profitMargin = p.costPrice > 0 ? (profit / p.costPrice) * 100 : 0;
+            const profitClass = profitMargin >= 50 ? 'success' : profitMargin >= 20 ? 'warning' : 'danger';
+            
+            const tr = elements.productsTable.insertRow();
+            tr.style.color = p.quantity <= p.lowStockThreshold && p.quantity > 0 ? '#ffc107' : (p.quantity === 0 ? '#dc3545' : 'inherit');
+            tr.innerHTML = `
+                <td>${p.id}</td>
+                <td>${p.name}</td>
+                <td>${p.quantity}</td>
+                <td>${p.lowStockThreshold}</td>
+                <td>${formatCurrency(p.costPrice)}</td>
+                <td>${formatCurrency(p.salePrice)}</td>
+                <td class="${profitClass}">${formatCurrency(profit)} (${profitMargin.toFixed(1)}%)</td>
+                <td>
+                    <button class="btn btn-sm btn-edit" data-id="${p.id}">Editar</button>
+                    <button class="btn btn-sm btn-delete" data-id="${p.id}">Excluir</button>
+                </td>`;
+        });
+    };
+
+    const renderSales = () => {
+        if (!elements.salesTable) return;
+        
+        elements.salesTable.innerHTML = '';
+        
+        let filteredSales = [...DB.sales];
+        
+        const dateFilter = document.getElementById('salesDateFilter')?.value || 'all';
+        const now = new Date();
+        
+        if (dateFilter === 'today') {
+            const today = getTodayDate();
+            filteredSales = filteredSales.filter(s => s.date.slice(0, 10) === today);
+        } else if (dateFilter === 'week') {
+            const startOfWeek = new Date(now);
+            startOfWeek.setDate(now.getDate() - now.getDay());
+            startOfWeek.setHours(0, 0, 0, 0);
+            
+            filteredSales = filteredSales.filter(s => {
+                const saleDate = new Date(s.date);
+                return saleDate >= startOfWeek;
+            });
+        } else if (dateFilter === 'month') {
+            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+            
+            filteredSales = filteredSales.filter(s => {
+                const saleDate = new Date(s.date);
+                return saleDate >= startOfMonth;
+            });
+        }
+        
+        const paymentFilter = document.getElementById('salesPaymentFilter')?.value || 'all';
+        if (paymentFilter !== 'all') {
+            filteredSales = filteredSales.filter(s => s.paymentMethod === paymentFilter);
+        }
+        
+        filteredSales.sort((a, b) => new Date(b.date) - new Date(a.date)).forEach(s => {
+            const tr = elements.salesTable.insertRow();
+            tr.innerHTML = `
+                <td>${formatDateTime(s.date)}</td>
+                <td>${s.client}</td>
+                <td>${s.products.map(p => `${p.name} (${p.quantity})`).join(', ')}</td>
+                <td>${formatCurrency(s.total)}</td>
+                <td>${s.paymentMethod}</td>
+                <td>${s.status}</td>
+                <td>
+                    <button class="btn btn-sm btn-details" data-id="${s.id}">Detalhes</button>
+                </td>`;
+        });
+    };
+
+    const renderExpenses = () => {
+        if (!elements.expensesTable) return;
+        
+        elements.expensesTable.innerHTML = '';
+        
+        DB.expenses.sort((a, b) => new Date(b.date) - new Date(a.date)).forEach(e => {
+            const tr = elements.expensesTable.insertRow();
+            tr.innerHTML = `
+                <td>${formatDate(e.date)}</td>
+                <td>${e.description}</td>
+                <td>${e.category}</td>
+                <td>${formatCurrency(e.value)}</td>
+                <td>${e.provider}</td>
+                <td>
+                    <button class="btn btn-sm">Editar</button>
+                    <button class="btn btn-sm btn-danger">Excluir</button>
+                </td>`;
+        });
+    };
+    
+    const renderReceivables = () => {
+        if (!elements.receivablesTable) return;
+        
+        elements.receivablesTable.innerHTML = '';
+        
+        DB.receivables.sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate)).forEach(r => {
+            const dueDate = new Date(r.dueDate);
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            const diffTime = dueDate - today;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            
+            let statusClass = '';
+            let daysText = '';
+            
+            if (r.status === 'Pago') {
+                statusClass = 'success';
+                daysText = 'Pago';
+            } else if (diffDays < 0) {
+                statusClass = 'danger';
+                daysText = `${Math.abs(diffDays)} dias atrasado`;
+            } else if (diffDays === 0) {
+                statusClass = 'warning';
+                daysText = 'Vence hoje';
+            } else {
+                daysText = `Vence em ${diffDays} dias`;
+            }
+            
+            const tr = elements.receivablesTable.insertRow();
+            tr.innerHTML = `
+                <td>${r.client}</td>
+                <td>${formatCurrency(r.value)}</td>
+                <td>${formatDate(r.dueDate)}</td>
+                <td class="${statusClass}">${r.status}</td>
+                <td>${daysText}</td>
+                <td>
+                    ${r.status === 'Pendente' ? 
+                        `<button class="btn btn-sm btn-success btn-paid" data-id="${r.id}">Marcar como Pago</button>` : 
+                        'Pago'
+                    }
+                </td>`;
+        });
+        
+        const pendingReceivables = DB.receivables.filter(r => r.status === 'Pendente');
+        const totalReceivables = pendingReceivables.reduce((acc, r) => acc + r.value, 0);
+        
+        const today = new Date();
+        const weekLater = new Date();
+        weekLater.setDate(today.getDate() + 7);
+        const weekReceivables = pendingReceivables
+            .filter(r => new Date(r.dueDate) >= today && new Date(r.dueDate) <= weekLater)
+            .reduce((acc, r) => acc + r.value, 0);
+            
+        const overdueReceivables = pendingReceivables
+            .filter(r => new Date(r.dueDate) < today && new Date(r.dueDate).toDateString() !== today.toDateString())
+            .reduce((acc, r) => acc + r.value, 0);
+            
+        const totalReceivablesEl = document.getElementById('totalReceivables');
+        const weekReceivablesEl = document.getElementById('weekReceivables');
+        const overdueReceivablesEl = document.getElementById('overdueReceivables');
+        
+        if (totalReceivablesEl) totalReceivablesEl.textContent = formatCurrency(totalReceivables);
+        if (weekReceivablesEl) weekReceivablesEl.textContent = formatCurrency(weekReceivables);
+        if (overdueReceivablesEl) overdueReceivablesEl.textContent = formatCurrency(overdueReceivables);
+    };
+
+    const loadSettingsForms = () => {
+        if (document.getElementById('companyName')) {
+            document.getElementById('companyName').value = DB.settings.company.name;
+            document.getElementById('companyAddress').value = DB.settings.company.address;
+            document.getElementById('companyPhone').value = DB.settings.company.phone;
+            document.getElementById('companyEmail').value = DB.settings.company.email;
+        }
+        
+        if (document.getElementById('defaultPaymentMethod')) {
+            document.getElementById('defaultPaymentMethod').value = DB.settings.sales.defaultPaymentMethod;
+            document.getElementById('taxPercentage').value = DB.settings.sales.taxPercentage;
+            document.getElementById('enableStockControl').checked = DB.settings.sales.enableStockControl;
+            document.getElementById('enableLowStockAlert').checked = DB.settings.sales.enableLowStockAlert;
+        }
+        
+        if (document.getElementById('notifyLowStock')) {
+            document.getElementById('notifyLowStock').checked = DB.settings.notifications.notifyLowStock;
+            document.getElementById('notifyOverdue').checked = DB.settings.notifications.notifyOverdue;
+            document.getElementById('notifyDailySales').checked = DB.settings.notifications.notifyDailySales;
+            document.getElementById('notificationSound').value = DB.settings.notifications.notificationSound;
+        }
+        
+        if (document.getElementById('backupFrequency')) {
+            document.getElementById('backupFrequency').value = DB.settings.backup.frequency;
+            document.getElementById('backupNotifications').checked = DB.settings.backup.notifyOnBackup;
+        }
+    };
+
+    // --- GRÁFICOS ---
+    const setupCharts = () => {
+        setupSalesChart();
+        setupProductsChart();
+    };
+
+    const setupSalesChart = () => {
+        const ctx = document.getElementById('salesChart');
+        if (!ctx) return;
+        
+        const days = parseInt(elements.chartRange?.value || '30');
+        
+        const salesByCategory = {};
+        const endDate = new Date();
+        const startDate = new Date();
+        startDate.setDate(endDate.getDate() - days);
+        
+        DB.sales.filter(sale => {
+            const saleDate = new Date(sale.date);
+            return saleDate >= startDate && saleDate <= endDate;
+        }).forEach(sale => {
+            sale.products.forEach(product => {
+                const productName = product.name;
+                if (!salesByCategory[productName]) {
+                    salesByCategory[productName] = 0;
+                }
+                salesByCategory[productName] += product.quantity * product.price;
+            });
+        });
+        
+        const categories = Object.keys(salesByCategory);
+        const values = Object.values(salesByCategory);
+        
+        if (salesChart) {
+            salesChart.destroy();
+        }
+        
+        salesChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: categories,
+                datasets: [{
+                    label: `Vendas (últimos ${days} dias)`,
+                    data: values,
+                    backgroundColor: 'rgba(255, 94, 0, 0.7)',
+                    borderColor: 'rgba(255, 94, 0, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return formatCurrency(value);
+                            }
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return formatCurrency(context.raw);
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    };
+
+    const setupProductsChart = () => {
+        const ctx = document.getElementById('productsChart');
+        if (!ctx) return;
+        
+        const productSales = {};
+        
+        DB.sales.forEach(sale => {
+            sale.products.forEach(product => {
+                const productName = product.name;
+                if (!productSales[productName]) {
+                    productSales[productName] = 0;
+                }
+                productSales[productName] += product.quantity;
+            });
+        });
+        
+        const topProducts = Object.entries(productSales)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 5);
+        
+        const productNames = topProducts.map(p => p[0]);
+        const productQuantities = topProducts.map(p => p[1]);
+        
+        if (productsChart) {
+            productsChart.destroy();
+        }
+        
+        productsChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: productNames,
+                datasets: [{
+                    data: productQuantities,
+                    backgroundColor: [
+                        'rgba(255, 94, 0, 0.7)',
+                        'rgba(255, 193, 7, 0.7)',
+                        'rgba(40, 167, 69, 0.7)',
+                        'rgba(23, 162, 184, 0.7)',
+                        'rgba(108, 117, 125, 0.7)'
+                    ],
+                    borderColor: [
+                        'rgba(255, 94, 0, 1)',
+                        'rgba(255, 193, 7, 1)',
+                        'rgba(40, 167, 69, 1)',
+                        'rgba(23, 162, 184, 1)',
+                        'rgba(108, 117, 125, 1)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+    };
+
+    // --- MODAL SYSTEM ---
+    const openModal = (title, formHTML, onSave, data = null, options = {}) => {
+        currentModalData = data;
+        elements.modalTitle.textContent = title;
+        elements.modalBody.innerHTML = formHTML;
+        onSaveCallback = onSave;
+        
+        if (options.showSaveButton === false) {
+            elements.modalSaveBtn.classList.add('hidden');
+        } else {
+            elements.modalSaveBtn.classList.remove('hidden');
+        }
+
+        elements.modalContainer.classList.remove('hidden');
+    };
+
+    const closeModal = () => {
+        elements.modalContainer.classList.add('hidden');
+        onSaveCallback = null;
+        currentModalData = null;
+    };
+
+    const showProductModal = (id = null) => {
+        const product = id ? DB.products.find(p => p.id === Number(id)) : null;
+        const title = id ? 'Editar Produto' : 'Adicionar Produto';
+        
+        const formHTML = `
+            <div class="form-group">
+                <label for="productName">Nome do Produto</label>
+                <input type="text" id="productName" value="${product ? product.name : ''}" required>
+            </div>
+            <div class="form-group">
+                <label for="productQuantity">Estoque Atual</label>
+                <input type="number" id="productQuantity" value="${product ? product.quantity : 0}" min="0" required>
+            </div>
+            <div class="form-group">
+                <label for="productLowStock">Estoque Mínimo</label>
+                <input type="number" id="productLowStock" value="${product ? product.lowStockThreshold : 5}" min="0" required>
+            </div>
+            <div class="form-group">
+                <label for="productCostPrice">Preço de Custo (R$)</label>
+                <input type="text" id="productCostPrice" value="${product ? product.costPrice.toFixed(2).replace('.', ',') : '0,00'}" required>
+            </div>
+            <div class="form-group">
+                <label for="productSalePrice">Preço de Venda (R$)</label>
+                <input type="text" id="productSalePrice" value="${product ? product.salePrice.toFixed(2).replace('.', ',') : '0,00'}" required>
             </div>
         `;
         
-        managementContent += `
-            <div class="table-item ${table.status !== 'free' ? 'active' : ''}" data-id="${table.id}">
-                <div class="table-number">Mesa ${table.number}</div>
-                <div class="table-status ${statusClass}">${statusText}</div>
-                <div class="table-capacity">${table.capacity} lugares</div>
-                <div class="table-description">${table.description || ''}</div>
-                <div style="margin-top: 10px;">
-                    <button class="action-btn edit-table" data-id="${table.id}"><i class="fas fa-edit"></i></button>
-                    <button class="action-btn delete-btn delete-table" data-id="${table.id}"><i class="fas fa-trash"></i></button>
-                    ${table.status === 'occupied' ? `
-                        <button class="action-btn close-table" data-id="${table.id}"><i class="fas fa-receipt"></i> Fechar</button>
-                        <div class="table-total">Total: R$ ${tableTotal.toFixed(2)}</div>
-                    ` : ''}
+        const onSave = () => {
+            const name = document.getElementById('productName').value;
+            const quantity = parseInt(document.getElementById('productQuantity').value, 10);
+            const lowStockThreshold = parseInt(document.getElementById('productLowStock').value, 10);
+            const costPrice = parseFormattedNumber(document.getElementById('productCostPrice').value);
+            const salePrice = parseFormattedNumber(document.getElementById('productSalePrice').value);
+
+            if (!name || isNaN(quantity) || isNaN(costPrice) || isNaN(salePrice) || isNaN(lowStockThreshold)) {
+                alert("Por favor, preencha todos os campos corretamente.");
+                return false;
+            }
+
+            if (id && product) {
+                product.name = name;
+                product.quantity = quantity;
+                product.lowStockThreshold = lowStockThreshold;
+                product.costPrice = costPrice;
+                product.salePrice = salePrice;
+                showNotification('Produto Atualizado', `Produto "${name}" atualizado com sucesso.`, 'success');
+            } else {
+                const newProduct = {
+                    id: Date.now(),
+                    name,
+                    quantity,
+                    lowStockThreshold,
+                    costPrice,
+                    salePrice
+                };
+                DB.products.push(newProduct);
+                showNotification('Produto Adicionado', `Produto "${name}" adicionado com sucesso.`, 'success');
+            }
+            
+            saveDB();
+            renderAll();
+            setupCharts();
+            return true;
+        };
+
+        openModal(title, formHTML, onSave, product);
+    };
+
+    const showSaleModal = () => {
+        let currentSaleItems = [];
+        const productOptions = DB.products.filter(p => p.quantity > 0)
+            .map(p => `<option value="${p.id}">${p.name} (Estoque: ${p.quantity})</option>`)
+            .join('');
+
+        const formHTML = `
+            <div class="form-group">
+                <label for="saleClient">Nome do Cliente</label>
+                <input type="text" id="saleClient" value="Consumidor Final" required>
+            </div>
+            <hr>
+            <h4>Adicionar Produtos</h4>
+            <div class="sale-product-adder" style="display: flex; gap: 10px; align-items: flex-end;">
+                <div class="form-group" style="flex-grow: 1;">
+                    <label for="saleProductSelect">Produto</label>
+                    <select id="saleProductSelect">${productOptions}</select>
+                </div>
+                <div class="form-group">
+                    <label for="saleProductQuantity">Quantidade</label>
+                    <input type="number" id="saleProductQuantity" value="1" min="1" style="width: 100px;">
+                </div>
+                <button type="button" class="btn btn-primary" id="addSaleItemBtn">Adicionar</button>
+            </div>
+            <div id="saleItemsList" class="sale-items-list"></div>
+            <div id="saleTotal" class="sale-total" style="text-align: right; font-weight: bold; margin: 10px 0;">Total: R$ 0,00</div>
+            <hr>
+            <h4>Forma de Pagamento</h4>
+            <div class="form-group">
+                <label for="paymentMethod">Método de Pagamento</label>
+                <select id="paymentMethod">
+                    <option value="Dinheiro">Dinheiro</option>
+                    <option value="PIX">PIX</option>
+                    <option value="Cartão">Cartão</option>
+                    <option value="Mixto">Misto</option>
+                </select>
+            </div>
+            <div id="mixedPayment" class="mixed-payment hidden">
+                <div class="form-group">
+                    <label for="paymentCash">Dinheiro (R$)</label>
+                    <input type="text" id="paymentCash" placeholder="0,00">
+                </div>
+                <div class="form-group">
+                    <label for="paymentCard">Cartão (R$)</label>
+                    <input type="text" id="paymentCard" placeholder="0,00">
                 </div>
             </div>
         `;
-    });
-    
-    if (tablesGrid) tablesGrid.innerHTML = tablesContent;
-    if (tablesManagement) tablesManagement.innerHTML = managementContent;
-    
-    // Adicionar event listeners às mesas
-    document.querySelectorAll('.table-item').forEach(tableItem => {
-        tableItem.addEventListener('click', (e) => {
-            const tableId = parseInt(e.currentTarget.getAttribute('data-id'));
-            const table = tables.find(t => t.id === tableId);
+
+        openModal('Nova Venda', formHTML, () => {
+            const client = document.getElementById('saleClient').value;
+            const paymentMethod = document.getElementById('paymentMethod').value;
+            let payCash = 0;
+            let payCard = 0;
+            const saleTotal = currentSaleItems.reduce((acc, item) => acc + item.total, 0);
+
+            if (paymentMethod === 'Mixto') {
+                payCash = parseFormattedNumber(document.getElementById('paymentCash').value);
+                payCard = parseFormattedNumber(document.getElementById('paymentCard').value);
+            } else if (paymentMethod === 'Dinheiro') {
+                payCash = saleTotal;
+            } else if (paymentMethod === 'Cartão' || paymentMethod === 'PIX') {
+                payCard = saleTotal;
+            }
             
-            if (table) {
-                if (table.status === 'free') {
-                    // Abrir modal de vendas para esta mesa
-                    openTableForSale(tableId);
-                } else if (table.status === 'occupied') {
-                    // Mostrar detalhes da mesa
-                    showTableDetails(tableId);
+            const totalPaid = payCash + payCard;
+
+            if (currentSaleItems.length === 0) {
+                alert("Adicione pelo menos um produto à venda.");
+                return false;
+            }
+            
+            if (paymentMethod === 'Mixto' && totalPaid < saleTotal) {
+                alert("O valor pago é menor que o total da venda.");
+                return false;
+            }
+            
+            if (!client) {
+                alert("Por favor, informe o nome do cliente.");
+                return false;
+            }
+
+            currentSaleItems.forEach(item => {
+                const productInDB = DB.products.find(p => p.id === item.id);
+                if (productInDB) {
+                    productInDB.quantity -= item.quantity;
+                    if (productInDB.quantity <= productInDB.lowStockThreshold && DB.settings.notifications.notifyLowStock) {
+                        showNotification('Estoque Baixo', `O produto "${productInDB.name}" está com estoque baixo.`, 'warning');
+                    }
                 }
+            });
+
+            DB.sales.push({
+                id: Date.now(),
+                date: new Date().toISOString(),
+                client,
+                products: currentSaleItems.map(p => ({
+                    id: p.id,
+                    name: p.name,
+                    quantity: p.quantity,
+                    price: p.price
+                })),
+                total: saleTotal,
+                status: 'Pago',
+                paymentMethod: paymentMethod,
+                payment: {
+                    cash: payCash,
+                    card: payCard
+                }
+            });
+
+            saveDB();
+            renderAll();
+            setupCharts();
+            return true;
+        });
+
+        setTimeout(() => {
+            const addSaleItemBtn = document.getElementById('addSaleItemBtn');
+            const paymentMethodSelect = document.getElementById('paymentMethod');
+            const mixedPaymentDiv = document.getElementById('mixedPayment');
+            const saleItemsList = document.getElementById('saleItemsList');
+            const saleTotal = document.getElementById('saleTotal');
+
+            if (addSaleItemBtn) {
+                addSaleItemBtn.addEventListener('click', () => {
+                    const productId = parseInt(document.getElementById('saleProductSelect').value);
+                    const quantity = parseInt(document.getElementById('saleProductQuantity').value);
+                    const product = DB.products.find(p => p.id === productId);
+
+                    if (!product || isNaN(quantity) || quantity <= 0) {
+                        alert("Selecione um produto e quantidade válidos.");
+                        return;
+                    }
+
+                    if (quantity > product.quantity) {
+                        alert(`Estoque insuficiente. Disponível: ${product.quantity}`);
+                        return;
+                    }
+
+                    const existingItem = currentSaleItems.find(item => item.id === productId);
+                    if (existingItem) {
+                        existingItem.quantity += quantity;
+                        existingItem.total = existingItem.quantity * existingItem.price;
+                    } else {
+                        currentSaleItems.push({
+                            id: product.id,
+                            name: product.name,
+                            quantity: quantity,
+                            price: product.salePrice,
+                            total: product.salePrice * quantity
+                        });
+                    }
+                    updateSaleItemsList();
+                });
             }
-        });
-    });
-    
-    // Adicionar event listeners aos botões de editar, excluir e fechar mesa
-    document.querySelectorAll('.edit-table').forEach(button => {
-        button.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const tableId = parseInt(button.getAttribute('data-id'));
-            editTable(tableId);
-        });
-    });
-    
-    document.querySelectorAll('.delete-table').forEach(button => {
-        button.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const tableId = parseInt(button.getAttribute('data-id'));
-            deleteTable(tableId);
-        });
-    });
-    
-    document.querySelectorAll('.close-table').forEach(button => {
-        button.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const tableId = parseInt(button.getAttribute('data-id'));
-            closeTable(tableId);
-        });
-    });
-}
 
-// Atualiza a tabela de contas a receber
-function updateReceivablesTable() {
-    const tableBody = document.getElementById('receivables-table-body');
-    const listBody = document.getElementById('receivables-list-body');
-    
-    if (!tableBody && !listBody) return;
-    
-    let tableContent = '';
-    let listContent = '';
-    
-    receivables.forEach(receivable => {
-        const pendingAmount = receivable.totalAmount - receivable.receivedAmount;
-        const status = pendingAmount <= 0 ? 'Paga' : 
-                      new Date(receivable.dueDate) < new Date() ? 'Atrasada' : 'Pendente';
-        
-        const statusClass = status === 'Paga' ? 'status-paid' : 
-                           status === 'Atrasada' ? 'status-overdue' : 'status-pending';
-        
-        tableContent += `
-            <tr>
-                <td>${receivable.client}</td>
-                <td>R$ ${receivable.totalAmount.toFixed(2)}</td>
-                <td>R$ ${receivable.receivedAmount.toFixed(2)}</td>
-                <td>R$ ${pendingAmount.toFixed(2)}</td>
-                <td>${formatDate(receivable.dueDate)}</td>
-                <td><span class="receivable-status ${statusClass}">${status}</span></td>
-                <td>
-                    <button class="action-btn view-receivable" data-id="${receivable.id}"><i class="fas fa-eye"></i></button>
-                    <button class="action-btn delete-btn delete-receivable" data-id="${receivable.id}"><i class="fas fa-trash"></i></button>
-                </td>
-            </tr>
-        `;
-        
-        listContent += `
-            <tr>
-                <td>${receivable.client}</td>
-                <td>R$ ${receivable.totalAmount.toFixed(2)}</td>
-                <td>R$ ${receivable.receivedAmount.toFixed(2)}</td>
-                <td>R$ ${pendingAmount.toFixed(2)}</td>
-                <td>${formatDate(receivable.dueDate)}</td>
-                <td><span class="receivable-status ${statusClass}">${status}</span></td>
-                <td>
-                    <button class="action-btn receive-payment" data-id="${receivable.id}"><i class="fas fa-money-bill-wave"></i></button>
-                    <button class="action-btn delete-btn delete-receivable" data-id="${receivable.id}"><i class="fas fa-trash"></i></button>
-                </td>
-            </tr>
-        `;
-    });
-    
-    if (tableBody) tableBody.innerHTML = tableContent;
-    if (listBody) listBody.innerHTML = listContent;
-    
-    // Adicionar event listeners aos botões
-    document.querySelectorAll('.view-receivable').forEach(button => {
-        button.addEventListener('click', (e) => {
-            const receivableId = parseInt(button.getAttribute('data-id'));
-            viewReceivable(receivableId);
-        });
-    });
-    
-    document.querySelectorAll('.receive-payment').forEach(button => {
-        button.addEventListener('click', (e) => {
-            const receivableId = parseInt(button.getAttribute('data-id'));
-            receivePayment(receivableId);
-        });
-    });
-    
-    document.querySelectorAll('.delete-receivable').forEach(button => {
-        button.addEventListener('click', (e) => {
-            const receivableId = parseInt(button.getAttribute('data-id'));
-            deleteReceivable(receivableId);
-        });
-    });
-}
-
-// Atualiza a tabela de gastos
-function updateExpensesTable() {
-    const tableBody = document.getElementById('expenses-table-body');
-    const listBody = document.getElementById('expenses-list-body');
-    
-    if (!tableBody && !listBody) return;
-    
-    let tableContent = '';
-    let listContent = '';
-    
-    // Ordenar gastos por data (mais recente primeiro)
-    const sortedExpenses = [...expenses].sort((a, b) => new Date(b.date) - new Date(a.date));
-    
-    sortedExpenses.forEach(expense => {
-        tableContent += `
-            <tr>
-                <td>${expense.description}</td>
-                <td>${expense.category}</td>
-                <td>R$ ${expense.amount.toFixed(2)}</td>
-                <td>${formatDate(expense.date)}</td>
-                <td>
-                    <button class="action-btn edit-expense" data-id="${expense.id}"><i class="fas fa-edit"></i></button>
-                    <button class="action-btn delete-btn delete-expense" data-id="${expense.id}"><i class="fas fa-trash"></i></button>
-                </td>
-            </tr>
-        `;
-        
-        listContent += `
-            <tr>
-                <td>${expense.description}</td>
-                <td>${expense.category}</td>
-                <td>R$ ${expense.amount.toFixed(2)}</td>
-                <td>${formatDate(expense.date)}</td>
-                <td>
-                    <button class="action-btn edit-expense" data-id="${expense.id}"><i class="fas fa-edit"></i></button>
-                    <button class="action-btn delete-btn delete-expense" data-id="${expense.id}"><i class="fas fa-trash"></i></button>
-                </td>
-            </tr>
-        `;
-    });
-    
-    if (tableBody) tableBody.innerHTML = tableContent;
-    if (listBody) listBody.innerHTML = listContent;
-    
-    // Adicionar event listeners aos botões
-    document.querySelectorAll('.edit-expense').forEach(button => {
-        button.addEventListener('click', (e) => {
-            const expenseId = parseInt(button.getAttribute('data-id'));
-            editExpense(expenseId);
-        });
-    });
-    
-    document.querySelectorAll('.delete-expense').forEach(button => {
-        button.addEventListener('click', (e) => {
-            const expenseId = parseInt(button.getAttribute('data-id'));
-            deleteExpense(expenseId);
-        });
-    });
-}
-
-// Configura os event listeners
-function setupEventListeners() {
-    // Navegação
-    document.getElementById('nav-dashboard').addEventListener('click', () => showSection('dashboard'));
-    document.getElementById('nav-products').addEventListener('click', () => showModal('products-modal'));
-    document.getElementById('nav-sales').addEventListener('click', () => showModal('sales-modal'));
-    document.getElementById('nav-tables').addEventListener('click', () => showModal('tables-modal'));
-    document.getElementById('nav-receivables').addEventListener('click', () => showModal('receivables-modal'));
-    document.getElementById('nav-expenses').addEventListener('click', () => showModal('expenses-modal'));
-    document.getElementById('nav-reports').addEventListener('click', () => showModal('reports-modal'));
-    
-    // Botões de ação
-    document.getElementById('btn-new-product').addEventListener('click', () => {
-        showModal('products-modal');
-        const tabAddProduct = document.querySelector('[data-tab="tab-add-product"]');
-        if (tabAddProduct) tabAddProduct.click();
-        const addProductForm = document.getElementById('add-product-form');
-        if (addProductForm) addProductForm.reset();
-        const editProductId = document.getElementById('edit-product-id');
-        if (editProductId) editProductId.value = '';
-        const submitProductBtn = document.getElementById('submit-product-btn');
-        if (submitProductBtn) submitProductBtn.textContent = 'Adicionar Produto';
-    });
-    
-    document.getElementById('btn-new-sale').addEventListener('click', () => showModal('sales-modal'));
-    document.getElementById('btn-manage-tables').addEventListener('click', () => showModal('tables-modal'));
-    document.getElementById('btn-receivables').addEventListener('click', () => showModal('receivables-modal'));
-    document.getElementById('btn-expenses').addEventListener('click', () => showModal('expenses-modal'));
-    document.getElementById('btn-generate-report').addEventListener('click', () => showModal('reports-modal'));
-    
-    // Fechar modais
-    document.getElementById('close-products').addEventListener('click', () => closeModal('products-modal'));
-    document.getElementById('close-sales').addEventListener('click', () => closeModal('sales-modal'));
-    document.getElementById('close-tables').addEventListener('click', () => closeModal('tables-modal'));
-    document.getElementById('close-receivables').addEventListener('click', () => closeModal('receivables-modal'));
-    document.getElementById('close-expenses').addEventListener('click', () => closeModal('expenses-modal'));
-    document.getElementById('close-reports').addEventListener('click', () => closeModal('reports-modal'));
-    document.getElementById('close-low-stock').addEventListener('click', () => closeModal('low-stock-modal'));
-    document.getElementById('close-today-sales').addEventListener('click', () => closeModal('today-sales-modal'));
-    
-    // Tabs
-    document.querySelectorAll('.tab-btn').forEach(button => {
-        button.addEventListener('click', (e) => {
-            const tabButtons = e.target.parentElement.querySelectorAll('.tab-btn');
-            const tabContents = e.target.parentElement.nextElementSibling.querySelectorAll('.tab-content');
-            const targetTab = e.target.getAttribute('data-tab');
-            
-            tabButtons.forEach(btn => btn.classList.remove('active'));
-            tabContents.forEach(content => content.classList.remove('active'));
-            
-            e.target.classList.add('active');
-            document.getElementById(targetTab).classList.add('active');
-            
-            // Atualizar conteúdo específico da aba
-            if (targetTab === 'tab-sales-history') {
-                updateSalesHistory();
-            } else if (targetTab === 'tab-receivables-list') {
-                updateReceivablesTable();
-            } else if (targetTab === 'tab-expenses-list') {
-                updateExpensesTable();
+            if (paymentMethodSelect) {
+                paymentMethodSelect.addEventListener('change', function() {
+                    if (this.value === 'Mixto') {
+                        mixedPaymentDiv.classList.remove('hidden');
+                    } else {
+                        mixedPaymentDiv.classList.add('hidden');
+                    }
+                });
             }
-        });
-    });
-    
-    // Formulários
-    document.getElementById('add-product-form').addEventListener('submit', (e) => {
-        e.preventDefault();
-        const productId = document.getElementById('edit-product-id').value;
-        if (productId) {
-            updateProduct(parseInt(productId));
-        } else {
-            addNewProduct();
-        }
-    });
-    
-    document.getElementById('add-table-form').addEventListener('submit', (e) => {
-        e.preventDefault();
-        addNewTable();
-    });
-    
-    document.getElementById('receive-payment-form').addEventListener('submit', (e) => {
-        e.preventDefault();
-        receivePaymentSubmit();
-    });
-    
-    document.getElementById('add-expense-form').addEventListener('submit', (e) => {
-        e.preventDefault();
-        addNewExpense();
-    });
-    
-    document.getElementById('add-receivable-form').addEventListener('submit', (e) => {
-        e.preventDefault();
-        addNewReceivable();
-    });
-    
-    // Adicionar categoria
-    document.getElementById('btn-add-category').addEventListener('click', addNewCategory);
-    
-    // Adicionar categoria de gastos
-    document.getElementById('btn-add-expense-category').addEventListener('click', addNewExpenseCategory);
-    
-    // Vendas
-    document.getElementById('btn-add-to-sale').addEventListener('click', addProductToSale);
-    document.getElementById('btn-finalize-sale').addEventListener('click', finalizeSale);
-    document.getElementById('sale-date').addEventListener('change', updateSalesHistory);
-    
-    // Tipo de venda
-    document.getElementById('sale-type').addEventListener('change', (e) => {
-        const saleType = e.target.value;
-        const tableSelection = document.getElementById('table-selection');
-        const clientSelection = document.getElementById('client-selection');
-        
-        if (tableSelection) tableSelection.style.display = saleType === 'table' ? 'block' : 'none';
-        if (clientSelection) clientSelection.style.display = saleType === 'credit' ? 'block' : 'none';
-    });
-    
-    // Busca de produtos
-    document.getElementById('search-product').addEventListener('input', filterProducts);
-    
-    // Opções de pagamento
-    document.querySelectorAll('.payment-option').forEach(option => {
-        option.addEventListener('click', (e) => {
-            selectPaymentMethod(e.currentTarget.getAttribute('data-method'));
-        });
-    });
-    
-    // Campos de pagamento
-    document.getElementById('cash-received').addEventListener('input', calculateCashChange);
-    document.getElementById('card-fee').addEventListener('input', calculateCardTotal);
-    
-    // Relatórios
-    document.getElementById('btn-generate-pdf').addEventListener('click', generatePDF);
-    
-    // Backup de dados
-    document.getElementById('export-data-btn').addEventListener('click', exportData);
-    document.getElementById('import-data-btn').addEventListener('click', () => {
-        const fileInput = document.createElement('input');
-        fileInput.type = 'file';
-        fileInput.accept = '.json';
-        fileInput.style.display = 'none';
-        fileInput.onchange = importData;
-        
-        document.body.appendChild(fileInput);
-        fileInput.click();
-        document.body.removeChild(fileInput);
-    });
-    
-    // Limpar vendas do dia
-    document.getElementById('btn-clear-sales').addEventListener('click', clearTodaySales);
-    
-    // Cliques fora do modal para fechar
-    window.addEventListener('click', (e) => {
-        if (e.target.classList.contains('modal')) {
-            e.target.style.display = 'none';
-        }
-    });
-    
-    // Abrir modal de produtos em falta ao clicar no card
-    document.getElementById('low-stock-card').addEventListener('click', () => {
-        showModal('low-stock-modal');
-        updateLowStockTable();
-    });
-    
-    // Abrir modal de vendas do dia ao clicar no card
-    document.getElementById('today-sales-card').addEventListener('click', () => {
-        showModal('today-sales-modal');
-        updateTodaySalesTable();
-    });
-    
-    // Abrir modal de mesas ativas ao clicar no card
-    document.getElementById('active-tables-card').addEventListener('click', () => {
-        showModal('tables-modal');
-    });
-    
-    // Filtros para produtos em falta
-    document.querySelectorAll('.filter-options .btn[data-filter]').forEach(button => {
-        button.addEventListener('click', (e) => {
-            // Remover classe active de todos os botões
-            document.querySelectorAll('.filter-options .btn[data-filter]').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            
-            // Adicionar classe active ao botão clicado
-            e.target.classList.add('active');
-            
-            // Atualizar filtro e tabela
-            currentLowStockFilter = e.target.getAttribute('data-filter');
-            updateLowStockTable();
-        });
-    });
-    
-    // Filtros para vendas do dia
-    document.querySelectorAll('.filter-options .btn[data-sales-filter]').forEach(button => {
-        button.addEventListener('click', (e) => {
-            // Remover classe active de todos os botões
-            document.querySelectorAll('.filter-options .btn[data-sales-filter]').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            
-            // Adicionar classe active ao botão clicado
-            e.target.classList.add('active');
-            
-            // Atualizar filtro e tabela
-            currentSalesFilter = e.target.getAttribute('data-sales-filter');
-            updateTodaySalesTable();
-        });
-    });
-}
 
-// Mostrar seção específica
-function showSection(section) {
-    // Ocultar todas as seções
-    document.querySelectorAll('.content-section').forEach(section => {
-        section.style.display = 'none';
-    });
-    
-    // Mostrar a seção solicitada
-    document.getElementById(`${section}-section`).style.display = 'block';
-    
-    // Atualizar navegação
-    document.querySelectorAll('nav a').forEach(link => {
-        link.classList.remove('active');
-    });
-    document.getElementById(`nav-${section}`).classList.add('active');
-}
-
-// Mostrar modal
-function showModal(modalId) {
-    // Ocultar todos os modais primeiro
-    document.querySelectorAll('.modal').forEach(modal => {
-        modal.style.display = 'none';
-    });
-    
-    // Mostrar o modal solicitado
-    const modal = document.getElementById(modalId);
-    if (modal) {
-        modal.style.display = 'block';
-        
-        // Se for o modal de vendas, atualizar a lista de vendas
-        if (modalId === 'sales-modal') {
-            updateSalesHistory();
-            // Resetar seleção de pagamento
-            selectedPaymentMethod = null;
-            document.querySelectorAll('.payment-option').forEach(option => {
-                option.classList.remove('selected');
-            });
-            const paymentDetails = document.getElementById('payment-details');
-            if (paymentDetails) paymentDetails.style.display = 'none';
-            const paymentMethodDisplay = document.getElementById('payment-method-display');
-            if (paymentMethodDisplay) paymentMethodDisplay.textContent = 'Método selecionado: Nenhum';
-            updatePaymentSummary();
-        }
-    }
-}
-
-// Fechar modal
-function closeModal(modalId) {
-    const modal = document.getElementById(modalId);
-    if (modal) {
-        modal.style.display = 'none';
-    }
-}
-
-// Formatar data
-function formatDate(dateString) {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('pt-BR');
-}
-
-// Adicionar novo produto
-function addNewProduct() {
-    const name = document.getElementById('productName');
-    const category = document.getElementById('productCategory');
-    const quantity = document.getElementById('productQuantity');
-    const price = document.getElementById('productPrice');
-    const minStock = document.getElementById('productMinStock');
-    
-    if (!name || !category || !quantity || !price || !minStock) return;
-    
-    const newProduct = {
-        id: products.length > 0 ? Math.max(...products.map(p => p.id)) + 1 : 1,
-        name: name.value,
-        category: category.value,
-        quantity: parseInt(quantity.value),
-        price: parseFloat(price.value),
-        minStock: parseInt(minStock.value)
-    };
-    
-    products.push(newProduct);
-    updateProductsTable();
-    updateDashboard();
-    
-    const addProductForm = document.getElementById('add-product-form');
-    if (addProductForm) addProductForm.reset();
-    
-    alert('Produto adicionado com sucesso!');
-}
-
-// Editar produto
-function editProduct(productId) {
-    const product = products.find(p => p.id === productId);
-    if (product) {
-        const editProductId = document.getElementById('edit-product-id');
-        const productName = document.getElementById('productName');
-        const productCategory = document.getElementById('productCategory');
-        const productQuantity = document.getElementById('productQuantity');
-        const productPrice = document.getElementById('productPrice');
-        const productMinStock = document.getElementById('productMinStock');
-        const submitProductBtn = document.getElementById('submit-product-btn');
-        
-        if (editProductId) editProductId.value = product.id;
-        if (productName) productName.value = product.name;
-        if (productCategory) productCategory.value = product.category;
-        if (productQuantity) productQuantity.value = product.quantity;
-        if (productPrice) productPrice.value = product.price;
-        if (productMinStock) productMinStock.value = product.minStock;
-        
-        if (submitProductBtn) submitProductBtn.textContent = 'Atualizar Produto';
-        
-        // Mostrar modal e mudar para a aba de adicionar/editar produto
-        showModal('products-modal');
-        const tabAddProduct = document.querySelector('[data-tab="tab-add-product"]');
-        if (tabAddProduct) tabAddProduct.click();
-    }
-}
-
-// Atualizar produto
-function updateProduct(productId) {
-    const name = document.getElementById('productName');
-    const category = document.getElementById('productCategory');
-    const quantity = document.getElementById('productQuantity');
-    const price = document.getElementById('productPrice');
-    const minStock = document.getElementById('productMinStock');
-    
-    if (!name || !category || !quantity || !price || !minStock) return;
-    
-    const productIndex = products.findIndex(p => p.id === productId);
-    if (productIndex !== -1) {
-        products[productIndex] = {
-            id: productId,
-            name: name.value,
-            category: category.value,
-            quantity: parseInt(quantity.value),
-            price: parseFloat(price.value),
-            minStock: parseInt(minStock.value)
-        };
-        
-        updateProductsTable();
-        updateDashboard();
-        
-        const addProductForm = document.getElementById('add-product-form');
-        if (addProductForm) addProductForm.reset();
-        
-        const editProductId = document.getElementById('edit-product-id');
-        if (editProductId) editProductId.value = '';
-        
-        const submitProductBtn = document.getElementById('submit-product-btn');
-        if (submitProductBtn) submitProductBtn.textContent = 'Adicionar Produto';
-        
-        alert('Produto atualizado com sucesso!');
-    }
-}
-
-// Excluir produto
-function deleteProduct(productId) {
-    if (confirm('Tem certeza que deseja excluir este produto?')) {
-        products = products.filter(p => p.id !== productId);
-        updateProductsTable();
-        updateDashboard();
-        alert('Produto excluído com sucesso!');
-    }
-}
-
-// Adicionar nova categoria
-function addNewCategory() {
-    const newCategoryInput = document.getElementById('newCategory');
-    if (!newCategoryInput) return;
-    
-    const newCategory = newCategoryInput.value.trim();
-    
-    if (newCategory && !categories.includes(newCategory)) {
-        categories.push(newCategory);
-        updateProductSelects();
-        newCategoryInput.value = '';
-        alert('Categoria adicionada com sucesso!');
-    } else if (categories.includes(newCategory)) {
-        alert('Esta categoria já existe!');
-    } else {
-        alert('Por favor, digite um nome válido para a categoria!');
-    }
-}
-
-// Excluir categoria
-function deleteCategory(category) {
-    // Verificar se há produtos usando esta categoria
-    const productsWithCategory = products.filter(p => p.category === category);
-    
-    if (productsWithCategory.length > 0) {
-        alert(`Não é possível excluir a categoria "${category}" porque existem ${productsWithCategory.length} produto(s) usando ela.`);
-        return;
-    }
-    
-    if (confirm(`Tem certeza que deseja excluir a categoria "${category}"?`)) {
-        categories = categories.filter(c => c !== category);
-        updateProductSelects();
-        alert('Categoria excluída com sucesso!');
-    }
-}
-
-// Adicionar nova mesa
-function addNewTable() {
-    const number = document.getElementById('tableNumber');
-    const capacity = document.getElementById('tableCapacity');
-    const description = document.getElementById('tableDescription');
-    
-    if (!number || !capacity) return;
-    
-    const newTable = {
-        id: tables.length > 0 ? Math.max(...tables.map(t => t.id)) + 1 : 1,
-        number: parseInt(number.value),
-        capacity: parseInt(capacity.value),
-        description: description ? description.value : '',
-        status: 'free',
-        orders: []
-    };
-    
-    tables.push(newTable);
-    updateTablesGrid();
-    updateDashboard();
-    
-    const addTableForm = document.getElementById('add-table-form');
-    if (addTableForm) addTableForm.reset();
-    
-    alert('Mesa adicionada com sucesso!');
-}
-
-// Editar mesa
-function editTable(tableId) {
-    const table = tables.find(t => t.id === tableId);
-    if (table) {
-        const tableNumber = document.getElementById('tableNumber');
-        const tableCapacity = document.getElementById('tableCapacity');
-        const tableDescription = document.getElementById('tableDescription');
-        
-        if (tableNumber) tableNumber.value = table.number;
-        if (tableCapacity) tableCapacity.value = table.capacity;
-        if (tableDescription) tableDescription.value = table.description || '';
-        
-        // Mudar para a aba de adicionar mesa
-        showModal('tables-modal');
-        const tabAddTable = document.querySelector('[data-tab="tab-add-table"]');
-        if (tabAddTable) tabAddTable.click();
-        
-        // Adicionar ID da mesa ao formulário para edição
-        const addTableForm = document.getElementById('add-table-form');
-        if (addTableForm) {
-            addTableForm.dataset.editId = tableId;
-            const submitButton = addTableForm.querySelector('button[type="submit"]');
-            if (submitButton) submitButton.textContent = 'Atualizar Mesa';
-        }
-    }
-}
-
-// Excluir mesa
-function deleteTable(tableId) {
-    if (confirm('Tem certeza que deseja excluir esta mesa?')) {
-        tables = tables.filter(t => t.id !== tableId);
-        updateTablesGrid();
-        updateDashboard();
-        alert('Mesa excluída com sucesso!');
-    }
-}
-
-// Fechar mesa
-function closeTable(tableId) {
-    const table = tables.find(t => t.id === tableId);
-    if (table && table.status === 'occupied') {
-        // Calcular total da mesa
-        const total = table.orders.reduce((sum, order) => sum + (order.price * order.quantity), 0);
-        
-        if (confirm(`Fechar mesa ${table.number}? Total: R$ ${total.toFixed(2)}`)) {
-            // Registrar venda
-            const today = new Date().toISOString().split('T')[0];
-            let saleId = sales.length > 0 ? Math.max(...sales.map(s => s.id)) + 1 : 1;
-            
-            table.orders.forEach(order => {
-                sales.push({
-                    id: saleId++,
-                    date: today,
-                    productId: order.productId,
-                    quantity: order.quantity,
-                    price: order.price,
-                    paymentMethod: 'dinheiro', // Assume pagamento em dinheiro para mesas
-                    tableId: tableId
+            const updateSaleItemsList = () => {
+                if (!saleItemsList) return;
+                
+                saleItemsList.innerHTML = '';
+                currentSaleItems.forEach(item => {
+                    const itemEl = document.createElement('div');
+                    itemEl.className = 'sale-item';
+                    itemEl.style.display = 'flex';
+                    itemEl.style.justifyContent = 'space-between';
+                    itemEl.style.padding = '5px 0';
+                    itemEl.innerHTML = `
+                        <span>${item.quantity}x ${item.name}</span>
+                        <span>${formatCurrency(item.total)}</span>
+                        <button type="button" class="btn btn-sm btn-danger" data-id="${item.id}">Remover</button>
+                    `;
+                    
+                    itemEl.querySelector('button').addEventListener('click', () => {
+                        currentSaleItems = currentSaleItems.filter(i => i.id !== item.id);
+                        updateSaleItemsList();
+                    });
+                    
+                    saleItemsList.appendChild(itemEl);
                 });
                 
-                // Atualizar estoque
-                const product = products.find(p => p.id === order.productId);
-                if (product) {
-                    product.quantity -= order.quantity;
+                const total = currentSaleItems.reduce((acc, item) => acc + item.total, 0);
+                if (saleTotal) {
+                    saleTotal.textContent = `Total: ${formatCurrency(total)}`;
                 }
-            });
-            
-            // Limpar mesa
-            table.orders = [];
-            table.status = 'free';
-            
-            updateTablesGrid();
-            updateProductsTable();
-            updateDashboard();
-            saveDataToLocalStorage();
-            
-            alert(`Mesa ${table.number} fechada com sucesso! Total: R$ ${total.toFixed(2)}`);
-        }
-    }
-}
-
-// Adicionar nova conta a receber
-function addNewReceivable() {
-    const client = document.getElementById('receivable-client');
-    const amount = document.getElementById('receivable-amount');
-    const dueDate = document.getElementById('receivable-due-date');
-    
-    if (!client || !amount || !dueDate) return;
-    
-    const newReceivable = {
-        id: receivables.length > 0 ? Math.max(...receivables.map(r => r.id)) + 1 : 1,
-        client: client.value,
-        totalAmount: parseFloat(amount.value),
-        receivedAmount: 0,
-        dueDate: dueDate.value,
-        status: 'pending',
-        sales: []
+            };
+        }, 100);
     };
-    
-    receivables.push(newReceivable);
-    updateReceivablesTable();
-    updateDashboard();
-    
-    const addReceivableForm = document.getElementById('add-receivable-form');
-    if (addReceivableForm) addReceivableForm.reset();
-    
-    alert('Conta a receber adicionada com sucesso!');
-}
 
-// Receber pagamento
-function receivePaymentSubmit() {
-    const receivableSelect = document.getElementById('receivable-select');
-    const paymentAmount = document.getElementById('payment-amount');
-    const paymentDate = document.getElementById('payment-date');
-    const paymentMethod = document.getElementById('payment-method');
-    
-    if (!receivableSelect || !paymentAmount || !paymentDate || !paymentMethod) return;
-    
-    const receivableId = parseInt(receivableSelect.value);
-    const amount = parseFloat(paymentAmount.value);
-    
-    if (!receivableId || amount <= 0) {
-        alert('Selecione uma conta e informe um valor válido!');
-        return;
-    }
-    
-    const receivable = receivables.find(r => r.id === receivableId);
-    if (receivable) {
-        const pendingAmount = receivable.totalAmount - receivable.receivedAmount;
-        
-        if (amount > pendingAmount) {
-            alert(`O valor informado (R$ ${amount.toFixed(2)}) é maior que o valor pendente (R$ ${pendingAmount.toFixed(2)})!`);
-            return;
-        }
-        
-        receivable.receivedAmount += amount;
-        
-        // Atualizar status
-        if (receivable.receivedAmount >= receivable.totalAmount) {
-            receivable.status = 'paid';
-        } else if (new Date(receivable.dueDate) < new Date()) {
-            receivable.status = 'overdue';
-        } else {
-            receivable.status = 'partial';
-        }
-        
-        updateReceivablesTable();
-        updateDashboard();
-        
-        const receivePaymentForm = document.getElementById('receive-payment-form');
-        if (receivePaymentForm) receivePaymentForm.reset();
-        
-        alert(`Pagamento de R$ ${amount.toFixed(2)} registrado com sucesso!`);
-    }
-}
+    const showSaleDetailsModal = (saleId) => {
+        const sale = DB.sales.find(s => s.id === Number(saleId));
+        if (!sale) return;
 
-// Excluir conta a receber
-function deleteReceivable(receivableId) {
-    if (confirm('Tem certeza que deseja excluir esta conta a receber?')) {
-        receivables = receivables.filter(r => r.id !== receivableId);
-        updateReceivablesTable();
-        updateDashboard();
-        alert('Conta a receber excluída com sucesso!');
-    }
-}
+        const title = `Detalhes da Venda - ${sale.id}`;
 
-// Adicionar novo gasto
-function addNewExpense() {
-    const description = document.getElementById('expense-description');
-    const category = document.getElementById('expense-category');
-    const amount = document.getElementById('expense-amount');
-    const date = document.getElementById('expense-date');
-    
-    if (!description || !category || !amount || !date) return;
-    
-    const newExpense = {
-        id: expenses.length > 0 ? Math.max(...expenses.map(e => e.id)) + 1 : 1,
-        description: description.value,
-        category: category.value,
-        amount: parseFloat(amount.value),
-        date: date.value
+        let productsHTML = sale.products.map(p => `
+            <li>${p.quantity}x ${p.name} - ${formatCurrency(p.price)} (Subtotal: ${formatCurrency(p.quantity * p.price)})</li>
+        `).join('');
+
+        const formHTML = `
+            <p><strong>Cliente:</strong> ${sale.client}</p>
+            <p><strong>Data/Hora:</strong> ${formatDateTime(sale.date)}</p>
+            <p><strong>Valor Total:</strong> ${formatCurrency(sale.total)}</p>
+            <p><strong>Método de Pagamento:</strong> ${sale.paymentMethod}</p>
+            <hr>
+            <h4>Produtos:</h4>
+            <ul>${productsHTML}</ul>
+        `;
+
+        openModal(title, formHTML, null, sale, { showSaveButton: false });
     };
-    
-    expenses.push(newExpense);
-    updateExpensesTable();
-    updateDashboard();
-    
-    const addExpenseForm = document.getElementById('add-expense-form');
-    if (addExpenseForm) addExpenseForm.reset();
-    
-    alert('Gasto adicionado com sucesso!');
-}
 
-// Editar gasto
-function editExpense(expenseId) {
-    const expense = expenses.find(e => e.id === expenseId);
-    if (expense) {
-        const expenseDescription = document.getElementById('expense-description');
-        const expenseCategory = document.getElementById('expense-category');
-        const expenseAmount = document.getElementById('expense-amount');
-        const expenseDate = document.getElementById('expense-date');
-        
-        if (expenseDescription) expenseDescription.value = expense.description;
-        if (expenseCategory) expenseCategory.value = expense.category;
-        if (expenseAmount) expenseAmount.value = expense.amount;
-        if (expenseDate) expenseDate.value = expense.date;
-        
-        // Mudar para a aba de adicionar gasto
-        showModal('expenses-modal');
-        const tabAddExpense = document.querySelector('[data-tab="tab-add-expense"]');
-        if (tabAddExpense) tabAddExpense.click();
-        
-        // Adicionar ID do gasto ao formulário para edição
-        const addExpenseForm = document.getElementById('add-expense-form');
-        if (addExpenseForm) {
-            addExpenseForm.dataset.editId = expenseId;
-            const submitButton = addExpenseForm.querySelector('button[type="submit"]');
-            if (submitButton) submitButton.textContent = 'Atualizar Gasto';
-        }
-    }
-}
-
-// Excluir gasto
-function deleteExpense(expenseId) {
-    if (confirm('Tem certeza que deseja excluir este gasto?')) {
-        expenses = expenses.filter(e => e.id !== expenseId);
-        updateExpensesTable();
-        updateDashboard();
-        alert('Gasto excluído com sucesso!');
-    }
-}
-
-// Adicionar nova categoria de gastos
-function addNewExpenseCategory() {
-    const newCategoryInput = document.getElementById('new-expense-category');
-    if (!newCategoryInput) return;
-    
-    const newCategory = newCategoryInput.value.trim();
-    
-    if (newCategory && !expenseCategories.includes(newCategory)) {
-        expenseCategories.push(newCategory);
-        updateProductSelects();
-        newCategoryInput.value = '';
-        alert('Categoria de gastos adicionada com sucesso!');
-    } else if (expenseCategories.includes(newCategory)) {
-        alert('Esta categoria já existe!');
-    } else {
-        alert('Por favor, digite um nome válido para a categoria!');
-    }
-}
-
-// Excluir categoria de gastos
-function deleteExpenseCategory(category) {
-    // Verificar se há gastos usando esta categoria
-    const expensesWithCategory = expenses.filter(e => e.category === category);
-    
-    if (expensesWithCategory.length > 0) {
-        alert(`Não é possível excluir a categoria "${category}" porque existem ${expensesWithCategory.length} gasto(s) usando ela.`);
-        return;
-    }
-    
-    if (confirm(`Tem certeza que deseja excluir a categoria "${category}"?`)) {
-        expenseCategories = expenseCategories.filter(c => c !== category);
-        updateProductSelects();
-        alert('Categoria de gastos excluída com sucesso!');
-    }
-}
-
-// Adicionar produto à venda
-function addProductToSale() {
-    const saleProduct = document.getElementById('sale-product');
-    const saleQuantity = document.getElementById('sale-quantity');
-    
-    if (!saleProduct || !saleQuantity) return;
-    
-    const productId = parseInt(saleProduct.value);
-    const quantity = parseInt(saleQuantity.value);
-    
-    if (!productId || quantity < 1) {
-        alert('Selecione um produto e uma quantidade válida!');
-        return;
-    }
-    
-    const product = products.find(p => p.id === productId);
-    
-    if (quantity > product.quantity) {
-        alert(`Quantidade solicitada indisponível. Estoque atual: ${product.quantity}`);
-        return;
-    }
-    
-    // Verificar se o produto já está na venda atual
-    const existingItem = currentSale.find(item => item.productId === productId);
-    
-    if (existingItem) {
-        if (existingItem.quantity + quantity > product.quantity) {
-            alert(`Quantidade total solicitada indisponível. Estoque atual: ${product.quantity}`);
-            return;
-        }
-        existingItem.quantity += quantity;
-    } else {
-        currentSale.push({
-            productId,
-            name: product.name,
-            price: product.price,
-            quantity
-        });
-    }
-    
-    updateSaleItems();
-    updatePaymentSummary();
-    if (saleQuantity) saleQuantity.value = 1;
-}
-
-// Atualizar itens da venda
-function updateSaleItems() {
-    const saleItemsContainer = document.getElementById('sale-items');
-    if (!saleItemsContainer) return;
-    
-    let itemsHtml = '';
-    
-    currentSale.forEach((item, index) => {
-        const total = item.price * item.quantity;
-        itemsHtml += `
-            <div class="sale-item">
-                <div>${item.name} - ${item.quantity} x R$ ${item.price.toFixed(2)}</div>
-                <div>R$ ${total.toFixed(2)} <button class="action-btn delete-btn remove-sale-item" data-index="${index}"><i class="fas fa-trash"></i></button></div>
+    const showExpenseModal = () => {
+        const formHTML = `
+            <div class="form-group">
+                <label for="expenseDate">Data</label>
+                <input type="date" id="expenseDate" value="${getTodayDate()}" required>
+            </div>
+            <div class="form-group">
+                <label for="expenseDescription">Descrição</label>
+                <input type="text" id="expenseDescription" required>
+            </div>
+            <div class="form-group">
+                <label for="expenseCategory">Categoria</label>
+                <input type="text" id="expenseCategory" required>
+            </div>
+            <div class="form-group">
+                <label for="expenseValue">Valor (R$)</label>
+                <input type="text" id="expenseValue" required>
+            </div>
+            <div class="form-group">
+                <label for="expenseProvider">Fornecedor</label>
+                <input type="text" id="expenseProvider" required>
             </div>
         `;
-    });
-    
-    saleItemsContainer.innerHTML = itemsHtml || '<p>Nenhum item adicionado à venda.</p>';
-    
-    // Calcular total
-    const totalAmount = currentSale.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    const saleTotalAmount = document.getElementById('sale-total-amount');
-    if (saleTotalAmount) saleTotalAmount.textContent = `R$ ${totalAmount.toFixed(2)}`;
-    
-    // Adicionar event listeners aos botões de remover
-    document.querySelectorAll('.remove-sale-item').forEach(button => {
-        button.addEventListener('click', (e) => {
-            const index = parseInt(e.target.getAttribute('data-index'));
-            currentSale.splice(index, 1);
-            updateSaleItems();
-            updatePaymentSummary();
-        });
-    });
-}
 
-// Selecionar método de pagamento
-function selectPaymentMethod(method) {
-    selectedPaymentMethod = method;
-    
-    // Remover seleção de todos os botões
-    document.querySelectorAll('.payment-option').forEach(option => {
-        option.classList.remove('selected');
-    });
-    
-    // Adicionar seleção ao botão clicado
-    const selectedOption = document.querySelector(`.payment-option[data-method="${method}"]`);
-    if (selectedOption) selectedOption.classList.add('selected');
-    
-    // Mostrar detalhes do pagamento selecionado
-    const paymentDetails = document.getElementById('payment-details');
-    if (paymentDetails) paymentDetails.style.display = 'block';
-    
-    // Ocultar todos os detalhes primeiro
-    const cashDetails = document.getElementById('cash-details');
-    const cardDetails = document.getElementById('card-details');
-    
-    if (cashDetails) cashDetails.style.display = 'none';
-    if (cardDetails) cardDetails.style.display = 'none';
-    
-    // Mostrar detalhes específicos do método selecionado
-    if (method === 'dinheiro') {
-        if (cashDetails) cashDetails.style.display = 'block';
-        const cashReceived = document.getElementById('cash-received');
-        if (cashReceived) cashReceived.value = '';
-        const cashChange = document.getElementById('cash-change');
-        if (cashChange) cashChange.textContent = 'Troco: R$ 0,00';
-    } else if (method === 'cartao') {
-        if (cardDetails) cardDetails.style.display = 'block';
-        const cardFeeInput = document.getElementById('card-fee');
-        if (cardFeeInput) cardFeeInput.value = '0';
-        calculateCardTotal();
-    }
-    
-    // Atualizar resumo do pagamento
-    updatePaymentSummary();
-}
+        const onSave = () => {
+            const date = document.getElementById('expenseDate').value;
+            const description = document.getElementById('expenseDescription').value;
+            const category = document.getElementById('expenseCategory').value;
+            const value = parseFormattedNumber(document.getElementById('expenseValue').value);
+            const provider = document.getElementById('expenseProvider').value;
 
-// Calcular troco para pagamento em dinheiro
-function calculateCashChange() {
-    const totalAmount = currentSale.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    const cashReceived = parseFloat(document.getElementById('cash-received').value) || 0;
-    const change = cashReceived - totalAmount;
-    
-    const cashChange = document.getElementById('cash-change');
-    if (cashChange) cashChange.textContent = `Troco: R$ ${change >= 0 ? change.toFixed(2) : '0,00'}`;
-    updatePaymentSummary();
-}
+            if (!date || !description || !category || isNaN(value) || value <= 0 || !provider) {
+                alert("Por favor, preencha todos os campos corretamente.");
+                return false;
+            }
 
-// Calcular total com taxa para cartão
-function calculateCardTotal() {
-    const totalAmount = currentSale.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    cardFee = parseFloat(document.getElementById('card-fee').value) || 0;
-    const totalWithFee = totalAmount + cardFee;
-    
-    const cardTotal = document.getElementById('card-total');
-    if (cardTotal) cardTotal.textContent = `Total com Taxa: R$ ${totalWithFee.toFixed(2)}`;
-    updatePaymentSummary();
-}
+            DB.expenses.push({ id: Date.now(), date, description, category, value, provider });
+            saveDB();
+            renderAll();
+            showNotification('Gasto Registrado', `Gasto "${description}" registrado com sucesso.`, 'success');
+            return true;
+        };
 
-// Atualizar resumo do pagamento
-function updatePaymentSummary() {
-    const totalAmount = currentSale.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    let paymentTotal = totalAmount;
-    let methodText = 'Nenhum';
-    
-    const paymentMethodDisplay = document.getElementById('payment-method-display');
-    const paymentTotalElement = document.getElementById('payment-total');
-    
-    if (selectedPaymentMethod === 'dinheiro') {
-        methodText = 'Dinheiro';
-        const cashReceived = parseFloat(document.getElementById('cash-received').value) || 0;
-        if (paymentTotalElement) paymentTotalElement.textContent = `Valor a pagar: R$ ${totalAmount.toFixed(2)} | Recebido: R$ ${cashReceived.toFixed(2)}`;
-    } else if (selectedPaymentMethod === 'pix') {
-        methodText = 'PIX';
-        if (paymentTotalElement) paymentTotalElement.textContent = `Valor a pagar: R$ ${totalAmount.toFixed(2)}`;
-    } else if (selectedPaymentMethod === 'cartao') {
-        methodText = 'Cartão';
-        paymentTotal = totalAmount + cardFee;
-        if (paymentTotalElement) paymentTotalElement.textContent = `Valor a pagar: R$ ${paymentTotal.toFixed(2)} (Produtos: R$ ${totalAmount.toFixed(2)} + Taxa: R$ ${cardFee.toFixed(2)})`;
-    } else {
-        if (paymentTotalElement) paymentTotalElement.textContent = `Valor a pagar: R$ ${totalAmount.toFixed(2)}`;
-    }
-    
-    if (paymentMethodDisplay) paymentMethodDisplay.textContent = `Método selecionado: ${methodText}`;
-}
+        openModal('Adicionar Gasto', formHTML, onSave);
+    };
 
-// Finalizar venda
-function finalizeSale() {
-    if (currentSale.length === 0) {
-        alert('Adicione pelo menos um item à venda!');
-        return;
-    }
-    
-    if (!selectedPaymentMethod) {
-        alert('Selecione uma forma de pagamento!');
-        return;
-    }
-    
-    // Verificar se para dinheiro foi informado o valor recebido
-    if (selectedPaymentMethod === 'dinheiro') {
-        const cashReceived = parseFloat(document.getElementById('cash-received').value) || 0;
-        const totalAmount = currentSale.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const showReceivableModal = () => {
+        const formHTML = `
+            <div class="form-group">
+                <label for="receivableClient">Cliente</label>
+                <input type="text" id="receivableClient" required>
+            </div>
+            <div class="form-group">
+                <label for="receivableValue">Valor (R$)</label>
+                <input type="text" id="receivableValue" required>
+            </div>
+            <div class="form-group">
+                <label for="receivableDueDate">Data de Vencimento</label>
+                <input type="date" id="receivableDueDate" value="${getTodayDate()}" required>
+            </div>
+        `;
+
+        const onSave = () => {
+            const client = document.getElementById('receivableClient').value;
+            const value = parseFormattedNumber(document.getElementById('receivableValue').value);
+            const dueDate = document.getElementById('receivableDueDate').value;
+
+            if (!client || isNaN(value) || value <= 0 || !dueDate) {
+                alert("Por favor, preencha todos os campos corretamente.");
+                return false;
+            }
+
+            DB.receivables.push({ id: Date.now(), client, value, dueDate, status: 'Pendente' });
+            saveDB();
+            renderAll();
+            showNotification('Conta a Receber Adicionada', `Conta de ${client} adicionada com sucesso.`, 'success');
+            return true;
+        };
+
+        openModal('Adicionar Conta a Receber', formHTML, onSave);
+    };
+
+    const showUserModal = () => {
+        const formHTML = `
+            <div class="form-group">
+                <label for="userName">Nome Completo</label>
+                <input type="text" id="userName" required>
+            </div>
+            <div class="form-group">
+                <label for="userUsername">Usuário</label>
+                <input type="text" id="userUsername" required>
+            </div>
+            <div class="form-group">
+                <label for="userPassword">Senha</label>
+                <input type="password" id="userPassword" required>
+            </div>
+            <div class="form-group">
+                <label for="userRole">Função</label>
+                <select id="userRole" required>
+                    <option value="user">Usuário</option>
+                    <option value="manager">Gerente</option>
+                    <option value="admin">Administrador</option>
+                </select>
+            </div>
+        `;
+
+        const onSave = () => {
+            const name = document.getElementById('userName').value;
+            const username = document.getElementById('userUsername').value;
+            const password = document.getElementById('userPassword').value;
+            const role = document.getElementById('userRole').value;
+
+            if (!name || !username || !password || !role) {
+                alert("Por favor, preencha todos os campos corretamente.");
+                return false;
+            }
+
+            if (DB.users.find(u => u.username === username)) {
+                alert("Já existe um usuário com este nome de usuário.");
+                return false;
+            }
+
+            DB.users.push({ name, username, password, role });
+            saveDB();
+            showNotification('Usuário Adicionado', `Usuário "${name}" adicionado com sucesso.`, 'success');
+            return true;
+        };
+
+        openModal('Adicionar Usuário', formHTML, onSave);
+    };
+
+    const showReportOptions = (reportType) => {
+        const reportOptions = document.getElementById('reportOptions');
+        const reportOptionsTitle = document.getElementById('reportOptionsTitle');
+        const reportCategoryGroup = document.getElementById('reportCategoryGroup');
         
-        if (cashReceived < totalAmount) {
-            alert(`Valor recebido (R$ ${cashReceived.toFixed(2)}) é menor que o total da venda (R$ ${totalAmount.toFixed(2)})!`);
+        if (!reportOptions || !reportOptionsTitle) return;
+        
+        reportOptions.classList.remove('hidden');
+        
+        switch (reportType) {
+            case 'sales':
+                reportOptionsTitle.textContent = 'Opções do Relatório de Vendas';
+                if (reportCategoryGroup) reportCategoryGroup.classList.remove('hidden');
+                break;
+            case 'products':
+                reportOptionsTitle.textContent = 'Opções do Relatório de Estoque';
+                if (reportCategoryGroup) reportCategoryGroup.classList.add('hidden');
+                break;
+            case 'financial':
+                reportOptionsTitle.textContent = 'Opções do Relatório Financeiro';
+                if (reportCategoryGroup) reportCategoryGroup.classList.add('hidden');
+                break;
+            case 'receivables':
+                reportOptionsTitle.textContent = 'Opções do Relatório de Contas a Receber';
+                if (reportCategoryGroup) reportCategoryGroup.classList.add('hidden');
+                break;
+        }
+        
+        const today = new Date();
+        const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+        document.getElementById('reportStartDate').value = firstDay.toISOString().slice(0, 10);
+        document.getElementById('reportEndDate').value = today.toISOString().slice(0, 10);
+    };
+
+    const generateCashClosing = () => {
+        const date = elements.cashClosingDate.value;
+        const initialValue = parseFormattedNumber(elements.cashClosingInitialValue.value) || 0;
+
+        if (!date) {
+            alert("Por favor, selecione uma data para o fechamento.");
             return;
         }
-    }
-    
-    const today = new Date().toISOString().split('T')[0];
-    let saleId = sales.length > 0 ? Math.max(...sales.map(s => s.id)) + 1 : 1;
-    
-    // Registrar vendas e atualizar estoque
-    currentSale.forEach(item => {
-        // Adicionar ao histórico de vendas
-        const saleData = {
-            id: saleId++,
-            date: today,
-            productId: item.productId,
-            quantity: item.quantity,
-            price: item.price,
-            paymentMethod: selectedPaymentMethod
-        };
-        
-        // Adicionar taxa do cartão se for pagamento com cartão
-        if (selectedPaymentMethod === 'cartao') {
-            saleData.cardFee = cardFee;
-        }
-        
-        sales.push(saleData);
-        
-        // Atualizar estoque
-        const product = products.find(p => p.id === item.productId);
-        if (product) {
-            product.quantity -= item.quantity;
-        }
-    });
-    
-    const totalSale = currentSale.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    let finalTotal = totalSale;
-    let paymentInfo = '';
-    
-    if (selectedPaymentMethod === 'cartao') {
-        finalTotal = totalSale + cardFee;
-        paymentInfo = `Total: R$ ${totalSale.toFixed(2)} + Taxa: R$ ${cardFee.toFixed(2)} = R$ ${finalTotal.toFixed(2)}`;
-    } else if (selectedPaymentMethod === 'dinheiro') {
-        const cashReceived = parseFloat(document.getElementById('cash-received').value) || 0;
-        const change = cashReceived - totalSale;
-        paymentInfo = `Recebido: R$ ${cashReceived.toFixed(2)} | Troco: R$ ${change.toFixed(2)}`;
-    } else {
-        paymentInfo = `Total: R$ ${finalTotal.toFixed(2)}`;
-    }
-    
-    alert(`Venda finalizada com sucesso! ${paymentInfo}`);
-    
-    // Limpar venda atual
-    currentSale = [];
-    selectedPaymentMethod = null;
-    cardFee = 0;
-    updateSaleItems();
-    updateProductsTable();
-    updateDashboard();
-    updateSalesHistory();
-    updateProductSelects();
-    
-    // Limpar campos de pagamento
-    document.querySelectorAll('.payment-option').forEach(option => {
-        option.classList.remove('selected');
-    });
-    
-    const paymentDetails = document.getElementById('payment-details');
-    if (paymentDetails) paymentDetails.style.display = 'none';
-    
-    const cashReceived = document.getElementById('cash-received');
-    if (cashReceived) cashReceived.value = '';
-    
-    const cardFeeInput = document.getElementById('card-fee');
-    if (cardFeeInput) cardFeeInput.value = '0';
-    
-    const paymentMethodDisplay = document.getElementById('payment-method-display');
-    if (paymentMethodDisplay) paymentMethodDisplay.textContent = 'Método selecionado: Nenhum';
-    
-    updatePaymentSummary();
-    
-    // Salvar dados
-    saveDataToLocalStorage();
-}
 
-// Atualizar histórico de vendas
-function updateSalesHistory() {
-    const salesHistoryBody = document.getElementById('sales-history-body');
-    if (!salesHistoryBody) return;
-    
-    const filterDate = document.getElementById('sale-date');
-    const filterDateValue = filterDate ? filterDate.value : '';
-    
-    let filteredSales = sales;
-    if (filterDateValue) {
-        filteredSales = sales.filter(sale => sale.date === filterDateValue);
-    }
-    
-    let salesHtml = '';
-    
-    if (filteredSales.length === 0) {
-        salesHtml = '<tr><td colspan="6">Nenhuma venda encontrada para esta data.</td></tr>';
-    } else {
-        filteredSales.forEach(sale => {
-            const product = products.find(p => p.id === sale.productId);
-            const total = sale.quantity * sale.price;
-            
-            salesHtml += `
-                <tr>
-                    <td>${formatDate(sale.date)}</td>
-                    <td>${product ? product.name : 'Produto não encontrado'}</td>
-                    <td>${sale.quantity}</td>
-                    <td>R$ ${sale.price.toFixed(2)}</td>
-                    <td>R$ ${total.toFixed(2)}</td>
-                    <td>${sale.paymentMethod.toUpperCase()}</td>
-                </tr>
-            `;
-        });
-    }
-    
-    salesHistoryBody.innerHTML = salesHtml;
-}
+        const salesForDate = DB.sales.filter(s => s.date.slice(0, 10) === date);
+        const expensesForDate = DB.expenses.filter(e => e.date.slice(0, 10) === date);
 
-// Atualizar tabela de produtos em falta
-function updateLowStockTable() {
-    const tableBody = document.getElementById('low-stock-table-body');
-    if (!tableBody) return;
-    
-    let tableContent = '';
-    
-    // Filtrar produtos baseado no filtro selecionado
-    let filteredProducts = [];
-    
-    if (currentLowStockFilter === 'all') {
-        filteredProducts = products.filter(product => 
-            product.quantity === 0 || product.quantity <= product.minStock
-        );
-    } else if (currentLowStockFilter === 'zero') {
-        filteredProducts = products.filter(product => product.quantity === 0);
-    } else if (currentLowStockFilter === 'low') {
-        filteredProducts = products.filter(product => 
-            product.quantity > 0 && product.quantity <= product.minStock
-        );
-    }
-    
-    if (filteredProducts.length === 0) {
-        tableContent = '<tr><td colspan="6">Nenhum produto encontrado com este filtro.</td></tr>';
-    } else {
-        filteredProducts.forEach(product => {
-            const status = product.quantity === 0 ? 'Esgotado' : 'Estoque Baixo';
-            const statusClass = product.quantity === 0 ? 'alert' : 'warning';
-            
-            tableContent += `
-                <tr class="${statusClass}">
-                    <td>${product.name}</td>
-                    <td>${product.category}</td>
-                    <td>${product.quantity}</td>
-                    <td>${product.minStock}</td>
-                    <td>${status}</td>
-                    <td>
-                        <button class="action-btn edit-product" data-id="${product.id}"><i class="fas fa-edit"></i></button>
-                        <button class="action-btn delete-btn delete-product" data-id="${product.id}"><i class="fas fa-trash"></i></button>
-                    </td>
-                </tr>
-            `;
-        });
-    }
-    
-    tableBody.innerHTML = tableContent;
-    
-    // Adicionar event listeners aos botões de editar e excluir
-    document.querySelectorAll('.edit-product').forEach(button => {
-        button.addEventListener('click', (e) => {
-            const productId = parseInt(e.target.closest('button').getAttribute('data-id'));
-            editProduct(productId);
-            closeModal('low-stock-modal');
-        });
-    });
-    
-    document.querySelectorAll('.delete-product').forEach(button => {
-        button.addEventListener('click', (e) => {
-            const productId = parseInt(e.target.closest('button').getAttribute('data-id'));
-            deleteProduct(productId);
-        });
-    });
-}
-
-// Atualizar tabela de vendas do dia
-function updateTodaySalesTable() {
-    const tableBody = document.getElementById('today-sales-table-body');
-    if (!tableBody) return;
-    
-    let tableContent = '';
-    
-    // Obter vendas de hoje
-    const today = new Date().toISOString().split('T')[0];
-    const todaySales = sales.filter(sale => sale.date === today);
-    
-    // Atualizar resumo
-    const totalSales = todaySales.reduce((sum, sale) => sum + (sale.quantity * sale.price), 0);
-    const totalProducts = todaySales.reduce((sum, sale) => sum + sale.quantity, 0);
-    
-    const modalSalesCount = document.getElementById('modal-sales-count');
-    const modalSalesTotal = document.getElementById('modal-sales-total');
-    const modalProductsSold = document.getElementById('modal-products-sold');
-    
-    if (modalSalesCount) modalSalesCount.textContent = todaySales.length;
-    if (modalSalesTotal) modalSalesTotal.textContent = `R$ ${totalSales.toFixed(2)}`;
-    if (modalProductsSold) modalProductsSold.textContent = totalProducts;
-    
-    if (todaySales.length === 0) {
-        tableContent = '<tr><td colspan="6">Nenhuma venda realizada hoje.</td></tr>';
-    } else {
-        // Agrupar vendas por produto se o filtro for "Por Produto"
-        if (currentSalesFilter === 'product') {
-            const productSales = {};
-            
-            todaySales.forEach(sale => {
-                const product = products.find(p => p.id === sale.productId);
-                if (product) {
-                    if (!productSales[product.id]) {
-                        productSales[product.id] = {
-                            product: product,
-                            quantity: 0,
-                            total: 0
-                        };
-                    }
-                    productSales[product.id].quantity += sale.quantity;
-                    productSales[product.id].total += sale.quantity * sale.price;
-                }
-            });
-            
-            for (const productId in productSales) {
-                const saleData = productSales[productId];
-                tableContent += `
-                    <tr>
-                        <td>${saleData.product.name}</td>
-                        <td>${saleData.product.category}</td>
-                        <td>${saleData.quantity}</td>
-                        <td>R$ ${saleData.product.price.toFixed(2)}</td>
-                        <td>R$ ${saleData.total.toFixed(2)}</td>
-                        <td>Várias</td>
-                    </tr>
-                `;
-            }
-        } 
-        // Agrupar vendas por categoria se o filtro for "Por Categoria"
-        else if (currentSalesFilter === 'category') {
-            const categorySales = {};
-            
-            todaySales.forEach(sale => {
-                const product = products.find(p => p.id === sale.productId);
-                if (product) {
-                    if (!categorySales[product.category]) {
-                        categorySales[product.category] = {
-                            quantity: 0,
-                            total: 0
-                        };
-                    }
-                    categorySales[product.category].quantity += sale.quantity;
-                    categorySales[product.category].total += sale.quantity * sale.price;
-                }
-            });
-            
-            for (const category in categorySales) {
-                const saleData = categorySales[category];
-                tableContent += `
-                    <tr>
-                        <td>Vários</td>
-                        <td>${category}</td>
-                        <td>${saleData.quantity}</td>
-                        <td>-</td>
-                        <td>R$ ${saleData.total.toFixed(2)}</td>
-                        <td>Várias</td>
-                    </tr>
-                `;
-            }
-        } 
-        // Mostrar todas as vendas individualmente
-        else {
-            todaySales.forEach(sale => {
-                const product = products.find(p => p.id === sale.productId);
-                const total = sale.quantity * sale.price;
-                
-                tableContent += `
-                    <tr>
-                        <td>${product ? product.name : 'Produto não encontrado'}</td>
-                        <td>${product ? product.category : '-'}</td>
-                        <td>${sale.quantity}</td>
-                        <td>R$ ${sale.price.toFixed(2)}</td>
-                        <td>R$ ${total.toFixed(2)}</td>
-                        <td>${sale.paymentMethod.toUpperCase()}</td>
-                    </tr>
-                `;
-            });
-        }
-    }
-    
-    tableBody.innerHTML = tableContent;
-}
-
-// Filtrar produtos na busca
-function filterProducts() {
-    const searchTerm = document.getElementById('search-product').value.toLowerCase();
-    const saleProductSelect = document.getElementById('sale-product');
-    
-    if (!saleProductSelect) return;
-    
-    // Mostrar/ocultar opções com base no termo de busca
-    for (let i = 0; i < saleProductSelect.options.length; i++) {
-        const option = saleProductSelect.options[i];
-        if (option.textContent.toLowerCase().includes(searchTerm)) {
-            option.style.display = '';
-        } else {
-            option.style.display = 'none';
-        }
-    }
-}
-
-// Abrir mesa para venda
-function openTableForSale(tableId) {
-    const table = tables.find(t => t.id === tableId);
-    if (table) {
-        table.status = 'occupied';
-        updateTablesGrid();
-        updateDashboard();
-        
-        // Abrir modal de vendas para esta mesa
-        showModal('sales-modal');
-        document.getElementById('sale-type').value = 'table';
-        document.getElementById('sale-table').value = tableId;
-        document.getElementById('table-selection').style.display = 'block';
-    }
-}
-
-// Gerar PDF
-function generatePDF() {
-    const reportType = document.getElementById('report-type');
-    const startDate = document.getElementById('report-start-date');
-    const endDate = document.getElementById('report-end-date');
-    
-    const reportTypeValue = reportType ? reportType.value : 'stock';
-    const startDateValue = startDate ? startDate.value : '';
-    const endDateValue = endDate ? endDate.value : '';
-    
-    // Usar jsPDF para gerar o PDF
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-    
-    // Configurações do documento
-    doc.setFontSize(20);
-    doc.setTextColor(40, 40, 40);
-    doc.text('Conteiner Beer - Relatório', 105, 15, { align: 'center' });
-    
-    doc.setFontSize(12);
-    doc.setTextColor(100, 100, 100);
-    doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, 105, 22, { align: 'center' });
-    
-    // Linha divisória
-    doc.setDrawColor(200, 200, 200);
-    doc.line(10, 25, 200, 25);
-    
-    let yPosition = 35;
-    
-    // Relatório de Estoque
-    if (reportTypeValue === 'stock') {
-        doc.setFontSize(16);
-        doc.setTextColor(40, 40, 40);
-        doc.text('Relatório de Estoque', 105, yPosition, { align: 'center' });
-        yPosition += 15;
-        
-        // Tabela de produtos
-        const tableData = products.map(product => [
-            product.name,
-            product.category,
-            product.quantity.toString(),
-            `R$ ${product.price.toFixed(2)}`,
-            product.quantity <= product.minStock ? (product.quantity === 0 ? 'Esgotado' : 'Baixo') : 'Normal'
-        ]);
-        
-        doc.autoTable({
-            startY: yPosition,
-            head: [['Produto', 'Categoria', 'Quantidade', 'Preço', 'Status']],
-            body: tableData,
-            theme: 'grid',
-            headStyles: {
-                fillColor: [60, 60, 60],
-                textColor: [255, 255, 255]
-            },
-            alternateRowStyles: {
-                fillColor: [240, 240, 240]
+        let totalCashSales = 0;
+        let totalCardSales = 0;
+        salesForDate.forEach(sale => {
+            if (sale.paymentMethod === 'Dinheiro') {
+                totalCashSales += sale.total;
+            } else if (sale.paymentMethod === 'PIX' || sale.paymentMethod === 'Cartão') {
+                totalCardSales += sale.total;
+            } else if (sale.paymentMethod === 'Mixto') {
+                totalCashSales += sale.payment?.cash || 0;
+                totalCardSales += sale.payment?.card || 0;
             }
         });
-    }
-    // Relatório de Vendas
-    else if (reportTypeValue === 'sales') {
-        doc.setFontSize(16);
-        doc.setTextColor(40, 40, 40);
-        
-        let filteredSales = sales;
-        let title = 'Relatório de Vendas - Todos os Períodos';
-        
-        if (startDateValue && endDateValue) {
-            filteredSales = sales.filter(sale => sale.date >= startDateValue && sale.date <= endDateValue);
-            title = `Relatório de Vendas - ${formatDate(startDateValue)} à ${formatDate(endDateValue)}`;
-        } else if (startDateValue) {
-            filteredSales = sales.filter(sale => sale.date >= startDateValue);
-            title = `Relatório de Vendas - A partir de ${formatDate(startDateValue)}`;
-        } else if (endDateValue) {
-            filteredSales = sales.filter(sale => sale.date <= endDateValue);
-            title = `Relatório de Vendas - Até ${formatDate(endDateValue)}`;
-        }
-        
-        doc.text(title, 105, yPosition, { align: 'center' });
-        yPosition += 15;
-        
-        if (filteredSales.length === 0) {
-            doc.setFontSize(12);
-            doc.text('Nenhuma venda encontrada para o período selecionado.', 105, yPosition, { align: 'center' });
-        } else {
-            // Calcular totais
-            const totalSales = filteredSales.reduce((sum, sale) => sum + (sale.quantity * sale.price), 0);
-            const totalItems = filteredSales.reduce((sum, sale) => sum + sale.quantity, 0);
-            
-            doc.setFontSize(12);
-            doc.text(`Total de Vendas: R$ ${totalSales.toFixed(2)}`, 14, yPosition);
-            doc.text(`Total de Itens Vendidos: ${totalItems}`, 14, yPosition + 7);
-            yPosition += 20;
-            
-            // Tabela de vendas
-            const tableData = filteredSales.map(sale => {
-                const product = products.find(p => p.id === sale.productId);
-                return [
-                    formatDate(sale.date),
-                    product ? product.name : 'Produto não encontrado',
-                    sale.quantity,
-                    `R$ ${sale.price.toFixed(2)}`,
-                    `R$ ${(sale.quantity * sale.price).toFixed(2)}`,
-                    sale.paymentMethod.toUpperCase()
-                ];
-            });
-            
-            doc.autoTable({
-                startY: yPosition,
-                head: [['Data', 'Produto', 'Quantidade', 'Preço', 'Total', 'Pagamento']],
-                body: tableData,
-                theme: 'grid',
-                headStyles: {
-                    fillColor: [60, 60, 60],
-                    textColor: [255, 255, 255]
-                },
-                alternateRowStyles: {
-                    fillColor: [240, 240, 240]
-                }
-            });
-        }
-    }
-    // Relatório de Produtos com Estoque Baixo
-    else if (reportTypeValue === 'low-stock') {
-        doc.setFontSize(16);
-        doc.setTextColor(40, 40, 40);
-        doc.text('Relatório de Produtos com Estoque Baixo', 105, yPosition, { align: 'center' });
-        yPosition += 15;
-        
-        const lowStockProducts = products.filter(product => 
-            product.quantity === 0 || product.quantity <= product.minStock
-        );
-        
-        if (lowStockProducts.length === 0) {
-            doc.setFontSize(12);
-            doc.text('Nenhum produto com estoque baixo ou zerado.', 105, yPosition, { align: 'center' });
-        } else {
-            const tableData = lowStockProducts.map(product => [
-                product.name,
-                product.category,
-                product.quantity.toString(),
-                product.minStock.toString(),
-                `R$ ${product.price.toFixed(2)}`,
-                product.quantity === 0 ? 'Esgotado' : 'Baixo'
-            ]);
-            
-            doc.autoTable({
-                startY: yPosition,
-                head: [['Produto', 'Categoria', 'Quantidade', 'Estoque Mínimo', 'Preço', 'Status']],
-                body: tableData,
-                theme: 'grid',
-                headStyles: {
-                    fillColor: [60, 60, 60],
-                    textColor: [255, 255, 255]
-                },
-                alternateRowStyles: {
-                    fillColor: [240, 240, 240]
-                }
-            });
-        }
-    }
-    // Relatório de Vendas do Dia
-    else if (reportTypeValue === 'daily-sales') {
-        const today = new Date().toISOString().split('T')[0];
-        const todaySales = sales.filter(sale => sale.date === today);
-        
-        doc.setFontSize(16);
-        doc.setTextColor(40, 40, 40);
-        doc.text(`Relatório de Vendas do Dia - ${formatDate(today)}`, 105, yPosition, { align: 'center' });
-        yPosition += 15;
-        
-        if (todaySales.length === 0) {
-            doc.setFontSize(12);
-            doc.text('Nenhuma venda realizada hoje.', 105, yPosition, { align: 'center' });
-        } else {
-            const totalSales = todaySales.reduce((sum, sale) => sum + (sale.quantity * sale.price), 0);
-            const totalItems = todaySales.reduce((sum, sale) => sum + sale.quantity, 0);
-            
-            doc.setFontSize(12);
-            doc.text(`Total de Vendas: R$ ${totalSales.toFixed(2)}`, 14, yPosition);
-            doc.text(`Total de Itens Vendidos: ${totalItems}`, 14, yPosition + 7);
-            yPosition += 20;
-            
-            const tableData = todaySales.map(sale => {
-                const product = products.find(p => p.id === sale.productId);
-                return [
-                    sale.id,
-                    product ? product.name : 'Produto não encontrado',
-                    product ? product.category : '-',
-                    sale.quantity,
-                    `R$ ${sale.price.toFixed(2)}`,
-                    `R$ ${(sale.quantity * sale.price).toFixed(2)}`,
-                    sale.paymentMethod.toUpperCase()
-                ];
-            });
-            
-            doc.autoTable({
-                startY: yPosition,
-                head: [['ID', 'Produto', 'Categoria', 'Quantidade', 'Preço', 'Total', 'Pagamento']],
-                body: tableData,
-                theme: 'grid',
-                headStyles: {
-                    fillColor: [60, 60, 60],
-                    textColor: [255, 255, 255]
-                },
-                alternateRowStyles: {
-                    fillColor: [240, 240, 240]
-                }
-            });
-        }
-    }
-    // Relatório de Contas a Receber
-    else if (reportTypeValue === 'receivables') {
-        doc.setFontSize(16);
-        doc.setTextColor(40, 40, 40);
-        doc.text('Relatório de Contas a Receber', 105, yPosition, { align: 'center' });
-        yPosition += 15;
-        
-        if (receivables.length === 0) {
-            doc.setFontSize(12);
-            doc.text('Nenhuma conta a receber encontrada.', 105, yPosition, { align: 'center' });
-        } else {
-            const tableData = receivables.map(receivable => {
-                const pendingAmount = receivable.totalAmount - receivable.receivedAmount;
-                const status = pendingAmount <= 0 ? 'Paga' : 
-                              new Date(receivable.dueDate) < new Date() ? 'Atrasada' : 'Pendente';
-                
-                return [
-                    receivable.client,
-                    `R$ ${receivable.totalAmount.toFixed(2)}`,
-                    `R$ ${receivable.receivedAmount.toFixed(2)}`,
-                    `R$ ${pendingAmount.toFixed(2)}`,
-                    formatDate(receivable.dueDate),
-                    status
-                ];
-            });
-            
-            doc.autoTable({
-                startY: yPosition,
-                head: [['Cliente', 'Valor Total', 'Valor Recebido', 'Valor Pendente', 'Data Venc.', 'Status']],
-                body: tableData,
-                theme: 'grid',
-                headStyles: {
-                    fillColor: [60, 60, 60],
-                    textColor: [255, 255, 255]
-                },
-                alternateRowStyles: {
-                    fillColor: [240, 240, 240]
-                }
-            });
-        }
-    }
-    // Relatório de Gastos
-    else if (reportTypeValue === 'expenses') {
-        doc.setFontSize(16);
-        doc.setTextColor(40, 40, 40);
-        
-        let filteredExpenses = expenses;
-        let title = 'Relatório de Gastos - Todos os Períodos';
-        
-        if (startDateValue && endDateValue) {
-            filteredExpenses = expenses.filter(expense => expense.date >= startDateValue && expense.date <= endDateValue);
-            title = `Relatório de Gastos - ${formatDate(startDateValue)} à ${formatDate(endDateValue)}`;
-        } else if (startDateValue) {
-            filteredExpenses = expenses.filter(expense => expense.date >= startDateValue);
-            title = `Relatório de Gastos - A partir de ${formatDate(startDateValue)}`;
-        } else if (endDateValue) {
-            filteredExpenses = expenses.filter(expense => expense.date <= endDateValue);
-            title = `Relatório de Gastos - Até ${formatDate(endDateValue)}`;
-        }
-        
-        doc.text(title, 105, yPosition, { align: 'center' });
-        yPosition += 15;
-        
-        if (filteredExpenses.length === 0) {
-            doc.setFontSize(12);
-            doc.text('Nenhum gasto encontrado para o período selecionado.', 105, yPosition, { align: 'center' });
-        } else {
-            const totalExpenses = filteredExpenses.reduce((sum, expense) => sum + expense.amount, 0);
-            
-            doc.setFontSize(12);
-            doc.text(`Total de Gastos: R$ ${totalExpenses.toFixed(2)}`, 14, yPosition);
-            yPosition += 15;
-            
-            const tableData = filteredExpenses.map(expense => [
-                expense.description,
-                expense.category,
-                `R$ ${expense.amount.toFixed(2)}`,
-                formatDate(expense.date)
-            ]);
-            
-            doc.autoTable({
-                startY: yPosition,
-                head: [['Descrição', 'Categoria', 'Valor', 'Data']],
-                body: tableData,
-                theme: 'grid',
-                headStyles: {
-                    fillColor: [60, 60, 60],
-                    textColor: [255, 255, 255]
-                },
-                alternateRowStyles: {
-                    fillColor: [240, 240, 240]
-                }
-            });
-        }
-    }
-    // Relatório de Mesas
-    else if (reportTypeValue === 'tables') {
-        doc.setFontSize(16);
-        doc.setTextColor(40, 40, 40);
-        doc.text('Relatório de Mesas', 105, yPosition, { align: 'center' });
-        yPosition += 15;
-        
-        if (tables.length === 0) {
-            doc.setFontSize(12);
-            doc.text('Nenhuma mesa cadastrada.', 105, yPosition, { align: 'center' });
-        } else {
-            const tableData = tables.map(table => {
-                const status = table.status === 'free' ? 'Livre' : 
-                              table.status === 'occupied' ? 'Ocupada' : 'Reservada';
-                
-                return [
-                    table.number,
-                    table.capacity,
-                    table.description || '-',
-                    status
-                ];
-            });
-            
-            doc.autoTable({
-                startY: yPosition,
-                head: [['Número', 'Capacidade', 'Descrição', 'Status']],
-                body: tableData,
-                theme: 'grid',
-                headStyles: {
-                    fillColor: [60, 60, 60],
-                    textColor: [255, 255, 255]
-                },
-                alternateRowStyles: {
-                    fillColor: [240, 240, 240]
-                }
-            });
-        }
-    }
-    
-    // Salvar o PDF
-    const fileName = `conteinerbeer-relatorio-${reportTypeValue}-${new Date().toISOString().split('T')[0]}.pdf`;
-    doc.save(fileName);
-    
-    alert(`Relatório ${reportTypeValue} gerado com sucesso!`);
-}
 
-// Inicializar mostrando a seção do dashboard
-showSection('dashboard');
+        const totalSales = totalCashSales + totalCardSales;
+        const totalExpenses = expensesForDate.reduce((acc, exp) => acc + exp.value, 0);
+        
+        const expectedCash = (initialValue + totalCashSales) - totalExpenses;
+
+        elements.closingDateResult.textContent = `Resumo do dia: ${formatDate(date)}`;
+        elements.closingCashSales.textContent = formatCurrency(totalCashSales);
+        elements.closingCardSales.textContent = formatCurrency(totalCardSales);
+        elements.closingTotalSales.textContent = formatCurrency(totalSales);
+        elements.closingInitialValue.textContent = formatCurrency(initialValue);
+        elements.closingExpenses.textContent = formatCurrency(totalExpenses);
+        elements.closingExpectedCash.textContent = formatCurrency(expectedCash);
+
+        elements.closingResult.classList.remove('hidden');
+    };
+
+    // --- RELATÓRIOS PDF ---
+    const generatePDFReport = () => {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        
+        const reportType = document.querySelector('.report-type-card.active')?.dataset.report;
+        const startDate = document.getElementById('reportStartDate')?.value;
+        const endDate = document.getElementById('reportEndDate')?.value;
+        
+        if (!reportType) {
+            alert('Selecione um tipo de relatório primeiro.');
+            return;
+        }
+        
+        if (!startDate || !endDate) {
+            alert('Selecione um período para o relatório.');
+            return;
+        }
+        
+        doc.setFontSize(18);
+        doc.text(`Relatório - ${reportType.toUpperCase()}`, 105, 15, { align: 'center' });
+        doc.setFontSize(12);
+        doc.text(`Período: ${formatDate(startDate)} até ${formatDate(endDate)}`, 105, 25, { align: 'center' });
+        
+        let yPosition = 35;
+        
+        switch(reportType) {
+            case 'sales':
+                const filteredSales = DB.sales.filter(s => new Date(s.date) >= new Date(startDate) && new Date(s.date) <= new Date(endDate));
+                doc.text(`Total de Vendas: ${formatCurrency(filteredSales.reduce((acc, s) => acc + s.total, 0))}`, 14, yPosition);
+                yPosition += 10;
+                doc.autoTable({
+                    startY: yPosition,
+                    head: [['Data', 'Cliente', 'Valor', 'Pagamento']],
+                    body: filteredSales.map(s => [formatDate(s.date), s.client, formatCurrency(s.total), s.paymentMethod || 'N/D'])
+                });
+                break;
+            case 'products':
+                doc.text(`Valor Total do Estoque: ${formatCurrency(DB.products.reduce((acc, p) => acc + (p.quantity * p.costPrice), 0))}`, 14, yPosition);
+                yPosition += 10;
+                doc.autoTable({
+                    startY: yPosition,
+                    head: [['Nome', 'Estoque', 'Mínimo', 'Preço Venda']],
+                    body: DB.products.map(p => [p.name, p.quantity, p.lowStockThreshold, formatCurrency(p.salePrice)])
+                });
+                break;
+            case 'financial':
+                const salesInPeriod = DB.sales.filter(s => new Date(s.date) >= new Date(startDate) && new Date(s.date) <= new Date(endDate));
+                const expensesInPeriod = DB.expenses.filter(e => new Date(e.date) >= new Date(startDate) && new Date(e.date) <= new Date(endDate));
+                const totalSales = salesInPeriod.reduce((acc, s) => acc + s.total, 0);
+                const totalExpenses = expensesInPeriod.reduce((acc, e) => acc + e.value, 0);
+                const profit = totalSales - totalExpenses;
+                
+                doc.text(`Receitas: ${formatCurrency(totalSales)}`, 14, yPosition); yPosition += 7;
+                doc.text(`Despesas: ${formatCurrency(totalExpenses)}`, 14, yPosition); yPosition += 7;
+                doc.text(`Lucro: ${formatCurrency(profit)}`, 14, yPosition); yPosition += 10;
+                
+                doc.autoTable({
+                    startY: yPosition,
+                    head: [['Data', 'Descrição', 'Categoria', 'Valor']],
+                    body: expensesInPeriod.map(e => [formatDate(e.date), e.description, e.category, formatCurrency(e.value)])
+                });
+                break;
+            case 'receivables':
+                const pendingReceivables = DB.receivables.filter(r => r.status === 'Pendente');
+                doc.text(`Total a Receber: ${formatCurrency(pendingReceivables.reduce((acc, r) => acc + r.value, 0))}`, 14, yPosition);
+                yPosition += 10;
+                doc.autoTable({
+                    startY: yPosition,
+                    head: [['Cliente', 'Valor', 'Vencimento', 'Status']],
+                    body: DB.receivables.map(r => [r.client, formatCurrency(r.value), formatDate(r.dueDate), r.status])
+                });
+                break;
+        }
+        
+        doc.save(`relatorio_${reportType}_${getTodayDate()}.pdf`);
+        showNotification('Relatório Gerado', `Relatório ${reportType} gerado com sucesso.`, 'success');
+    };
+
+    // --- OUTRAS FUNÇÕES ---
+    const clearTodaySales = () => {
+        if (confirm('Tem certeza que deseja limpar todas as vendas de hoje? Esta ação não pode ser desfeita.')) {
+            const today = getTodayDate();
+            DB.sales = DB.sales.filter(sale => sale.date.slice(0, 10) !== today);
+            saveDB();
+            renderAll();
+            showNotification('Vendas Limpas', 'Vendas de hoje foram limpas com sucesso.', 'success');
+        }
+    };
+
+    // --- INICIALIZAÇÃO ---
+    const init = () => {
+        const savedTheme = localStorage.getItem('conteinerBeer_theme');
+        if (savedTheme === 'light') {
+            document.body.classList.add('light-theme');
+            if (elements.themeToggle) {
+                elements.themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
+            }
+        }
+
+        if (elements.loginForm) {
+            elements.loginForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const username = elements.username.value;
+                const password = elements.password.value;
+                
+                if (login(username, password)) {
+                    elements.username.value = '';
+                    elements.password.value = '';
+                } else {
+                    alert('Usuário ou senha incorretos.');
+                }
+            });
+        }
+        
+        if (window.innerWidth <= 768) {
+            elements.sidebar.classList.add('collapsed');
+        }
+        
+        setupLoginSystem();
+        
+        document.getElementById('addProductBtn')?.addEventListener('click', () => showProductModal());
+        document.getElementById('addSaleBtn')?.addEventListener('click', showSaleModal);
+        document.getElementById('addExpenseBtn')?.addEventListener('click', showExpenseModal);
+        document.getElementById('addReceivableBtn')?.addEventListener('click', showReceivableModal);
+    };
+
+    init();
+});
