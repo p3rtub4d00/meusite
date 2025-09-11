@@ -15,6 +15,10 @@ document.addEventListener('DOMContentLoaded', () => {
         paymentTotalAmount: document.getElementById('paymentModal').querySelector('#paymentTotalAmount'),
         paymentOptionsFooter: document.getElementById('paymentModal').querySelector('#paymentOptionsFooter'),
         paymentCancelBtn: document.getElementById('paymentModal').querySelector('#paymentCancelBtn'),
+
+        payByCashBtn: document.getElementById('payByCashBtn'),
+        payByCardBtn: document.getElementById('payByCardBtn'),
+        payByPixBtn: document.getElementById('payByPixBtn'),
     };
     let currentTableId = null;
 
@@ -80,7 +84,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const closeOrderModal = () => {
         elements.orderModal.classList.add('hidden');
-        currentTableId = null;
+        // A linha "currentTableId = null;" foi removida daqui para corrigir o bug.
     };
 
     const renderOrderModalBody = () => {
@@ -176,17 +180,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const showPaymentModal = () => {
         const order = DB.openOrders[currentTableId];
-        if (order.items.length === 0) {
+        if (!order || order.items.length === 0) {
             alert("Não é possível fechar uma comanda vazia.");
             return;
         }
         elements.paymentTotalAmount.textContent = formatCurrency(order.total);
-        closeOrderModal();
+        closeOrderModal(); // Apenas esconde o modal, não limpa o ID
         elements.paymentModal.classList.remove('hidden');
     };
 
     const closePaymentModal = () => {
         elements.paymentModal.classList.add('hidden');
+        currentTableId = null; // Limpa o ID da mesa ao cancelar o pagamento
     };
 
     const finalizeSale = (paymentMethod) => {
@@ -196,7 +201,7 @@ document.addEventListener('DOMContentLoaded', () => {
             id: Date.now(),
             date: new Date().toISOString(),
             client: DB.tables.find(t => t.id === currentTableId)?.name || 'Comanda',
-            products: order.items,
+            products: order.items.map(item => ({...item})),
             total: order.total,
             status: 'Pago',
             paymentMethod: paymentMethod,
@@ -213,13 +218,12 @@ document.addEventListener('DOMContentLoaded', () => {
         DB.sales.push(newSale);
         delete DB.openOrders[currentTableId];
 
-        // CORREÇÃO: Substituindo o alert() por uma notificação no sistema.
         const notification = {
             id: Date.now(),
             title: 'Venda Registrada (Comanda)',
-            message: `Venda da mesa "${newSale.client}" finalizada com sucesso no valor de ${formatCurrency(newSale.total)}.`,
+            message: `Venda da mesa "${newSale.client}" finalizada em ${formatCurrency(newSale.total)}.`,
             type: 'success',
-            timestamp: new Date(),
+            timestamp: new Date().toISOString(),
             read: false
         };
         DB.notifications.unshift(notification);
@@ -227,6 +231,7 @@ document.addEventListener('DOMContentLoaded', () => {
         saveDB();
         closePaymentModal();
         renderTablesGrid();
+        currentTableId = null; // Limpa o ID da mesa após o sucesso
     };
 
     // --- INICIALIZAÇÃO E EVENT LISTENERS ---
@@ -234,18 +239,28 @@ document.addEventListener('DOMContentLoaded', () => {
         loadDB();
         renderTablesGrid();
 
-        elements.modalCloseBtn.addEventListener('click', closeOrderModal);
-        elements.modalCancelBtn.addEventListener('click', closeOrderModal);
+        elements.modalCloseBtn.addEventListener('click', () => {
+            closeOrderModal();
+            currentTableId = null; // Limpa o ID da mesa ao fechar
+        });
+        elements.modalCancelBtn.addEventListener('click', () => {
+            closeOrderModal();
+            currentTableId = null; // Limpa o ID da mesa ao fechar
+        });
         elements.closeBillBtn.addEventListener('click', showPaymentModal);
 
         elements.paymentCancelBtn.addEventListener('click', closePaymentModal);
-        elements.paymentOptionsFooter.addEventListener('click', (e) => {
-            const target = e.target.closest('button');
-            if (target && target.dataset.method) {
-                const paymentMethod = target.dataset.method;
-                finalizeSale(paymentMethod);
-            }
-        });
+        
+        // Listeners individuais para cada botão de pagamento
+        if (elements.payByCashBtn) {
+            elements.payByCashBtn.addEventListener('click', () => finalizeSale('Dinheiro'));
+        }
+        if (elements.payByCardBtn) {
+            elements.payByCardBtn.addEventListener('click', () => finalizeSale('Cartão'));
+        }
+        if (elements.payByPixBtn) {
+            elements.payByPixBtn.addEventListener('click', () => finalizeSale('PIX'));
+        }
 
         elements.modalBody.addEventListener('click', (e) => {
             const target = e.target.closest('button');
@@ -255,7 +270,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 addItemToOrder();
             }
             if (target.classList.contains('remove-item-btn')) {
-                const itemIndex = target.dataset.index;
+                const itemIndex = parseInt(target.dataset.index, 10);
                 removeItemFromOrder(itemIndex);
             }
         });
