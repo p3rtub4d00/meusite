@@ -6,7 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
         expenses: [],
         receivables: [],
         tables: [],
-        openOrders: {}, 
+        openOrders: {},
         settings: {
             company: {
                 name: "CONTEINER BEER",
@@ -612,6 +612,22 @@ document.addEventListener('DOMContentLoaded', () => {
                     showNotification('Mesa Removida', 'A mesa foi removida com sucesso.', 'success');
                 }
             }
+            
+            // CORREÇÃO: Adicionados os listeners para os botões de gastos
+            if (target.classList.contains('btn-edit-expense')) {
+                showExpenseModal(id);
+            }
+
+            if (target.classList.contains('btn-delete-expense')) {
+                const expenseId = Number(id);
+                if (confirm("Tem certeza que deseja excluir este gasto?")) {
+                    DB.expenses = DB.expenses.filter(expense => expense.id !== expenseId);
+                    saveDB();
+                    renderExpenses(); 
+                    renderDashboard(); 
+                    showNotification('Gasto Removido', 'O gasto foi removido com sucesso.', 'success');
+                }
+            }
         });
         
         document.getElementById('productSearch')?.addEventListener('input', renderProducts);
@@ -853,8 +869,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td>${formatCurrency(e.value)}</td>
                 <td>${e.provider}</td>
                 <td>
-                    <button class="btn btn-sm">Editar</button>
-                    <button class="btn btn-sm btn-danger">Excluir</button>
+                    <button class="btn btn-sm btn-edit-expense" data-id="${e.id}">Editar</button>
+                    <button class="btn btn-sm btn-danger btn-delete-expense" data-id="${e.id}">Excluir</button>
                 </td>`;
         });
     };
@@ -1405,27 +1421,31 @@ document.addEventListener('DOMContentLoaded', () => {
         openModal(title, formHTML, null, sale, { showSaveButton: false });
     };
 
-    const showExpenseModal = () => {
+    // CORREÇÃO: Função modificada para aceitar um ID e carregar dados para edição
+    const showExpenseModal = (expenseId = null) => {
+        const expense = expenseId ? DB.expenses.find(e => e.id === Number(expenseId)) : null;
+        const title = expenseId ? 'Editar Gasto' : 'Adicionar Gasto';
+
         const formHTML = `
             <div class="form-group">
                 <label for="expenseDate">Data</label>
-                <input type="date" id="expenseDate" value="${getTodayDate()}" required>
+                <input type="date" id="expenseDate" value="${expense ? expense.date : getTodayDate()}" required>
             </div>
             <div class="form-group">
                 <label for="expenseDescription">Descrição</label>
-                <input type="text" id="expenseDescription" required>
+                <input type="text" id="expenseDescription" value="${expense ? expense.description : ''}" required>
             </div>
             <div class="form-group">
                 <label for="expenseCategory">Categoria</label>
-                <input type="text" id="expenseCategory" required>
+                <input type="text" id="expenseCategory" value="${expense ? expense.category : ''}" required>
             </div>
             <div class="form-group">
                 <label for="expenseValue">Valor (R$)</label>
-                <input type="text" id="expenseValue" required>
+                <input type="text" id="expenseValue" value="${expense ? expense.value.toFixed(2).replace('.', ',') : ''}" required>
             </div>
             <div class="form-group">
                 <label for="expenseProvider">Fornecedor</label>
-                <input type="text" id="expenseProvider" required>
+                <input type="text" id="expenseProvider" value="${expense ? expense.provider : ''}" required>
             </div>
         `;
 
@@ -1441,14 +1461,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 return false;
             }
 
-            DB.expenses.push({ id: Date.now(), date, description, category, value, provider });
+            if (expense) {
+                // Modo de Edição
+                expense.date = date;
+                expense.description = description;
+                expense.category = category;
+                expense.value = value;
+                expense.provider = provider;
+                showNotification('Gasto Atualizado', `Gasto "${description}" atualizado com sucesso.`, 'success');
+            } else {
+                // Modo de Adição
+                DB.expenses.push({ id: Date.now(), date, description, category, value, provider });
+                showNotification('Gasto Registrado', `Gasto "${description}" registrado com sucesso.`, 'success');
+            }
+
             saveDB();
             renderAll();
-            showNotification('Gasto Registrado', `Gasto "${description}" registrado com sucesso.`, 'success');
             return true;
         };
 
-        openModal('Adicionar Gasto', formHTML, onSave);
+        openModal(title, formHTML, onSave);
     };
 
     const showReceivableModal = () => {
@@ -1734,7 +1766,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         document.getElementById('addProductBtn')?.addEventListener('click', () => showProductModal());
         document.getElementById('addSaleBtn')?.addEventListener('click', showSaleModal);
-        document.getElementById('addExpenseBtn')?.addEventListener('click', showExpenseModal);
+        document.getElementById('addExpenseBtn')?.addEventListener('click', () => showExpenseModal(null)); // Corrigido para passar null
         document.getElementById('addReceivableBtn')?.addEventListener('click', showReceivableModal);
     };
 
