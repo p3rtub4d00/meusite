@@ -6,7 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
         expenses: [],
         receivables: [],
         tables: [],
-        openOrders: {}, // CORREÇÃO: Adicionado para que o sistema principal reconheça e não apague as comandas abertas.
+        openOrders: {}, 
         settings: {
             company: {
                 name: "CONTEINER BEER",
@@ -163,6 +163,9 @@ document.addEventListener('DOMContentLoaded', () => {
             read: false
         };
         
+        if (!DB.notifications) {
+            DB.notifications = [];
+        }
         DB.notifications.unshift(notification);
         updateNotificationsUI();
         saveDB();
@@ -261,7 +264,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         updateDataSize();
     };
-
+    
     const updateDataSize = () => {
         const data = JSON.stringify(DB);
         const sizeInKB = (new Blob([data]).size / 1024).toFixed(2);
