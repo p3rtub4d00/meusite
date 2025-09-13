@@ -19,6 +19,10 @@ document.addEventListener('DOMContentLoaded', () => {
         payByCashBtn: document.getElementById('payByCashBtn'),
         payByCardBtn: document.getElementById('payByCardBtn'),
         payByPixBtn: document.getElementById('payByPixBtn'),
+
+        // NOVO: Inputs de desconto e acréscimo
+        comandaDiscountInput: document.getElementById('comandaDiscount'),
+        comandaSurchargeInput: document.getElementById('comandaSurcharge'),
     };
     let currentTableId = null;
 
@@ -36,6 +40,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const saveDB = () => {
         localStorage.setItem('conteinerBeerDB', JSON.stringify(DB));
+    };
+
+    const parseFormattedNumber = (value) => {
+        if (typeof value !== 'string' || value.trim() === '') return 0;
+        const cleanedValue = value.replace('R$', '').trim().replace(/\./g, '').replace(',', '.');
+        return parseFloat(cleanedValue) || 0;
     };
 
     const formatCurrency = (value) => {
@@ -84,10 +94,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const closeOrderModal = () => {
         elements.orderModal.classList.add('hidden');
-        // A linha "currentTableId = null;" foi removida daqui para corrigir o bug.
     };
 
     const renderOrderModalBody = () => {
+        if (!currentTableId) return;
         const order = DB.openOrders[currentTableId];
         const productOptions = DB.products
             .filter(p => p.quantity > 0)
@@ -178,31 +188,53 @@ document.addEventListener('DOMContentLoaded', () => {
         renderOrderModalBody();
     };
 
+    // NOVO: Função para atualizar o total no modal de pagamento
+    const updatePaymentModalTotal = () => {
+        const order = DB.openOrders[currentTableId];
+        if (!order) return;
+
+        const subtotal = order.total;
+        const discount = parseFormattedNumber(elements.comandaDiscountInput.value);
+        const surcharge = parseFormattedNumber(elements.comandaSurchargeInput.value);
+        const finalTotal = subtotal - discount + surcharge;
+
+        elements.paymentTotalAmount.textContent = formatCurrency(finalTotal);
+    };
+
     const showPaymentModal = () => {
         const order = DB.openOrders[currentTableId];
         if (!order || order.items.length === 0) {
             alert("Não é possível fechar uma comanda vazia.");
             return;
         }
-        elements.paymentTotalAmount.textContent = formatCurrency(order.total);
-        closeOrderModal(); // Apenas esconde o modal, não limpa o ID
+        // Limpa os campos antes de mostrar
+        elements.comandaDiscountInput.value = '';
+        elements.comandaSurchargeInput.value = '';
+        updatePaymentModalTotal(); // Calcula e exibe o total inicial
+        closeOrderModal();
         elements.paymentModal.classList.remove('hidden');
     };
 
     const closePaymentModal = () => {
         elements.paymentModal.classList.add('hidden');
-        currentTableId = null; // Limpa o ID da mesa ao cancelar o pagamento
+        currentTableId = null; 
     };
 
     const finalizeSale = (paymentMethod) => {
         const order = DB.openOrders[currentTableId];
+        const discount = parseFormattedNumber(elements.comandaDiscountInput.value);
+        const surcharge = parseFormattedNumber(elements.comandaSurchargeInput.value);
+        const finalTotal = order.total - discount + surcharge;
 
         const newSale = {
             id: Date.now(),
             date: new Date().toISOString(),
             client: DB.tables.find(t => t.id === currentTableId)?.name || 'Comanda',
             products: order.items.map(item => ({...item})),
-            total: order.total,
+            subtotal: order.total,
+            discount: discount,
+            surcharge: surcharge,
+            total: finalTotal,
             status: 'Pago',
             paymentMethod: paymentMethod,
             payment: {}
@@ -226,12 +258,12 @@ document.addEventListener('DOMContentLoaded', () => {
             timestamp: new Date().toISOString(),
             read: false
         };
+        if (!DB.notifications) DB.notifications = [];
         DB.notifications.unshift(notification);
 
         saveDB();
         closePaymentModal();
         renderTablesGrid();
-        currentTableId = null; // Limpa o ID da mesa após o sucesso
     };
 
     // --- INICIALIZAÇÃO E EVENT LISTENERS ---
@@ -239,28 +271,19 @@ document.addEventListener('DOMContentLoaded', () => {
         loadDB();
         renderTablesGrid();
 
-        elements.modalCloseBtn.addEventListener('click', () => {
-            closeOrderModal();
-            currentTableId = null; // Limpa o ID da mesa ao fechar
-        });
-        elements.modalCancelBtn.addEventListener('click', () => {
-            closeOrderModal();
-            currentTableId = null; // Limpa o ID da mesa ao fechar
-        });
+        elements.modalCloseBtn.addEventListener('click', () => { closeOrderModal(); currentTableId = null; });
+        elements.modalCancelBtn.addEventListener('click', () => { closeOrderModal(); currentTableId = null; });
         elements.closeBillBtn.addEventListener('click', showPaymentModal);
 
         elements.paymentCancelBtn.addEventListener('click', closePaymentModal);
         
-        // Listeners individuais para cada botão de pagamento
-        if (elements.payByCashBtn) {
-            elements.payByCashBtn.addEventListener('click', () => finalizeSale('Dinheiro'));
-        }
-        if (elements.payByCardBtn) {
-            elements.payByCardBtn.addEventListener('click', () => finalizeSale('Cartão'));
-        }
-        if (elements.payByPixBtn) {
-            elements.payByPixBtn.addEventListener('click', () => finalizeSale('PIX'));
-        }
+        elements.payByCashBtn?.addEventListener('click', () => finalizeSale('Dinheiro'));
+        elements.payByCardBtn?.addEventListener('click', () => finalizeSale('Cartão'));
+        elements.payByPixBtn?.addEventListener('click', () => finalizeSale('PIX'));
+
+        // NOVO: Listeners para atualizar o total dinamicamente
+        elements.comandaDiscountInput?.addEventListener('input', updatePaymentModalTotal);
+        elements.comandaSurchargeInput?.addEventListener('input', updatePaymentModalTotal);
 
         elements.modalBody.addEventListener('click', (e) => {
             const target = e.target.closest('button');
