@@ -124,7 +124,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const getTodayDate = () => new Date().toISOString().slice(0, 10);
-    
+
     // --- FUNÇÃO DO RELÓGIO ---
     const updateClock = () => {
         if (elements.liveClock) {
@@ -758,7 +758,6 @@ document.addEventListener('DOMContentLoaded', () => {
             Math.max(...monthExpenses.map(e => e.value)) : 0;
         if (elements.highestExpense) elements.highestExpense.textContent = formatCurrency(highestExpense);
         
-        // CORREÇÃO: "Vendas Recentes" agora mostra as últimas 10, independente da data.
         if (elements.recentSalesTable) {
             elements.recentSalesTable.innerHTML = '';
             const allSalesSorted = [...DB.sales].sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -1436,7 +1435,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const title = `Detalhes da Venda - ${sale.id}`;
         
-        const subtotal = sale.subtotal || sale.products.reduce((acc, p) => acc + (p.price * p.quantity), 0);
+        const subtotal = sale.subtotal !== undefined ? sale.subtotal : sale.products.reduce((acc, p) => acc + (p.price * p.quantity), 0);
         const discount = sale.discount || 0;
         const surcharge = sale.surcharge || 0;
 
@@ -1520,19 +1519,151 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const showReceivableModal = () => {
-        // ... (código existente)
+        const formHTML = `
+            <div class="form-group">
+                <label for="receivableClient">Cliente</label>
+                <input type="text" id="receivableClient" required>
+            </div>
+            <div class="form-group">
+                <label for="receivableValue">Valor (R$)</label>
+                <input type="text" id="receivableValue" required>
+            </div>
+            <div class="form-group">
+                <label for="receivableDueDate">Data de Vencimento</label>
+                <input type="date" id="receivableDueDate" value="${getTodayDate()}" required>
+            </div>
+        `;
+
+        const onSave = () => {
+            const client = document.getElementById('receivableClient').value;
+            const value = parseFormattedNumber(document.getElementById('receivableValue').value);
+            const dueDate = document.getElementById('receivableDueDate').value;
+
+            if (!client || isNaN(value) || value <= 0 || !dueDate) {
+                alert("Por favor, preencha todos os campos corretamente.");
+                return false;
+            }
+
+            DB.receivables.push({ id: Date.now(), client, value, dueDate, status: 'Pendente' });
+            saveDB();
+            renderAll();
+            showNotification('Conta a Receber Adicionada', `Conta de ${client} adicionada com sucesso.`, 'success');
+            return true;
+        };
+
+        openModal('Adicionar Conta a Receber', formHTML, onSave);
     };
 
     const showUserModal = () => {
-        // ... (código existente)
+        const formHTML = `
+            <div class="form-group">
+                <label for="userName">Nome Completo</label>
+                <input type="text" id="userName" required>
+            </div>
+            <div class="form-group">
+                <label for="userUsername">Usuário</label>
+                <input type="text" id="userUsername" required>
+            </div>
+            <div class="form-group">
+                <label for="userPassword">Senha</label>
+                <input type="password" id="userPassword" required>
+            </div>
+            <div class="form-group">
+                <label for="userRole">Função</label>
+                <select id="userRole" required>
+                    <option value="user">Usuário</option>
+                    <option value="manager">Gerente</option>
+                    <option value="admin">Administrador</option>
+                </select>
+            </div>
+        `;
+
+        const onSave = () => {
+            const name = document.getElementById('userName').value;
+            const username = document.getElementById('userUsername').value;
+            const password = document.getElementById('userPassword').value;
+            const role = document.getElementById('userRole').value;
+
+            if (!name || !username || !password || !role) {
+                alert("Por favor, preencha todos os campos corretamente.");
+                return false;
+            }
+
+            if (DB.users.find(u => u.username === username)) {
+                alert("Já existe um usuário com este nome de usuário.");
+                return false;
+            }
+
+            DB.users.push({ name, username, password, role });
+            saveDB();
+            showNotification('Usuário Adicionado', `Usuário "${name}" adicionado com sucesso.`, 'success');
+            return true;
+        };
+
+        openModal('Adicionar Usuário', formHTML, onSave);
     };
     
-    const showReportOptions = () => {
-        // ... (código existente)
+    const showReportOptions = (reportType) => {
+        const reportOptions = document.getElementById('reportOptions');
+        const reportOptionsTitle = document.getElementById('reportOptionsTitle');
+        const reportCategoryGroup = document.getElementById('reportCategoryGroup');
+        
+        if (!reportOptions || !reportOptionsTitle) return;
+        
+        reportOptions.classList.remove('hidden');
+        
+        switch (reportType) {
+            case 'sales': reportOptionsTitle.textContent = 'Opções do Relatório de Vendas'; if (reportCategoryGroup) reportCategoryGroup.classList.remove('hidden'); break;
+            case 'products': reportOptionsTitle.textContent = 'Opções do Relatório de Estoque'; if (reportCategoryGroup) reportCategoryGroup.classList.add('hidden'); break;
+            case 'financial': reportOptionsTitle.textContent = 'Opções do Relatório Financeiro'; if (reportCategoryGroup) reportCategoryGroup.classList.add('hidden'); break;
+            case 'receivables': reportOptionsTitle.textContent = 'Opções do Relatório de Contas a Receber'; if (reportCategoryGroup) reportCategoryGroup.classList.add('hidden'); break;
+        }
+        
+        const today = new Date();
+        const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+        document.getElementById('reportStartDate').value = firstDay.toISOString().slice(0, 10);
+        document.getElementById('reportEndDate').value = today.toISOString().slice(0, 10);
     };
     
     const generateCashClosing = () => {
-        // ... (código existente)
+        const date = elements.cashClosingDate.value;
+        const initialValue = parseFormattedNumber(elements.cashClosingInitialValue.value) || 0;
+
+        if (!date) {
+            alert("Por favor, selecione uma data para o fechamento.");
+            return;
+        }
+
+        const salesForDate = DB.sales.filter(s => s.date.slice(0, 10) === date);
+        const expensesForDate = DB.expenses.filter(e => e.date.slice(0, 10) === date);
+
+        let totalCashSales = 0;
+        let totalCardSales = 0;
+        salesForDate.forEach(sale => {
+            if (sale.paymentMethod === 'Dinheiro') {
+                totalCashSales += sale.total;
+            } else if (sale.paymentMethod === 'PIX' || sale.paymentMethod === 'Cartão') {
+                totalCardSales += sale.total;
+            } else if (sale.paymentMethod === 'Mixto') {
+                totalCashSales += sale.payment?.cash || 0;
+                totalCardSales += sale.payment?.card || 0;
+            }
+        });
+
+        const totalSales = totalCashSales + totalCardSales;
+        const totalExpenses = expensesForDate.reduce((acc, exp) => acc + exp.value, 0);
+        
+        const expectedCash = (initialValue + totalCashSales) - totalExpenses;
+
+        elements.closingDateResult.textContent = `Resumo do dia: ${formatDate(date)}`;
+        elements.closingCashSales.textContent = formatCurrency(totalCashSales);
+        elements.closingCardSales.textContent = formatCurrency(totalCardSales);
+        elements.closingTotalSales.textContent = formatCurrency(totalSales);
+        elements.closingInitialValue.textContent = formatCurrency(initialValue);
+        elements.closingExpenses.textContent = formatCurrency(totalExpenses);
+        elements.closingExpectedCash.textContent = formatCurrency(expectedCash);
+
+        elements.closingResult.classList.remove('hidden');
     };
 
     const generatePDFReport = () => {
@@ -1540,7 +1671,13 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const clearTodaySales = () => {
-        // ... (código existente)
+        if (confirm('Tem certeza que deseja limpar todas as vendas de hoje? Esta ação não pode ser desfeita.')) {
+            const today = getTodayDate();
+            DB.sales = DB.sales.filter(sale => sale.date.slice(0, 10) !== today);
+            saveDB();
+            renderAll();
+            showNotification('Vendas Limpas', 'Vendas de hoje foram limpas com sucesso.', 'success');
+        }
     };
 
     // --- INICIALIZAÇÃO ---
