@@ -70,11 +70,21 @@
             justify-content: space-between;
             padding: 8px 0;
             border-bottom: 1px solid var(--border-color);
+            align-items: center;
         }
         .modal-footer-comanda {
             display: flex;
             justify-content: space-between;
             width: 100%;
+            align-items: center;
+        }
+        .item-details {
+            flex-grow: 1;
+        }
+        .item-surcharge {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-left: 10px;
         }
     </style>
 </head>
@@ -102,7 +112,10 @@
                 </div>
             <div class="modal-footer">
                 <div class="modal-footer-comanda">
-                    <button class="btn btn-danger" id="closeBillBtn"><i class="fas fa-dollar-sign"></i> Fechar Conta</button>
+                    <div>
+                        <button class="btn btn-info" id="printBillBtn"><i class="fas fa-print"></i> Imprimir</button>
+                        <button class="btn btn-danger" id="closeBillBtn"><i class="fas fa-dollar-sign"></i> Fechar Conta</button>
+                    </div>
                     <button class="btn btn-secondary" id="modalCancelBtn">Voltar</button>
                 </div>
             </div>
@@ -119,9 +132,12 @@
                     <label for="comandaDiscount">Desconto (R$)</label>
                     <input type="text" id="comandaDiscount" placeholder="0,00">
                 </div>
-                <div class="form-group" style="padding: 0 10px;">
-                    <label for="comandaSurcharge">Acréscimo (R$)</label>
-                    <input type="text" id="comandaSurcharge" placeholder="0,00">
+                <div class="form-group" style="padding: 0 10px; margin-top: 15px;">
+                     <label class="checkbox-label">
+                        <input type="checkbox" id="includeTipCheckbox">
+                        <span class="checkmark"></span>
+                        Incluir 10% do Garçom
+                    </label>
                 </div>
                 <hr>
                 <h3 style="text-align: center; margin-bottom: 20px;">Total a Pagar: <span id="paymentTotalAmount"></span></h3>
