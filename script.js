@@ -6,14 +6,34 @@ document.addEventListener('DOMContentLoaded', () => {
         expenses: [],
         receivables: [],
         tables: [],
-        openOrders: {},
+        openOrders: {}, 
         settings: {
-            company: { name: "CONTEINER BEER", address: "", phone: "", email: "" },
-            sales: { defaultPaymentMethod: "Dinheiro", taxPercentage: 0, enableStockControl: true, enableLowStockAlert: true },
-            notifications: { notifyLowStock: true, notifyOverdue: true, notifyDailySales: true, notificationSound: "default" },
-            backup: { frequency: 30, notifyOnBackup: true }
+            company: {
+                name: "CONTEINER BEER",
+                address: "",
+                phone: "",
+                email: ""
+            },
+            sales: {
+                defaultPaymentMethod: "Dinheiro",
+                taxPercentage: 0,
+                enableStockControl: true,
+                enableLowStockAlert: true
+            },
+            notifications: {
+                notifyLowStock: true,
+                notifyOverdue: true,
+                notifyDailySales: true,
+                notificationSound: "default"
+            },
+            backup: {
+                frequency: 30,
+                notifyOnBackup: true
+            }
         },
-        users: [{ username: "admin", password: "admin", name: "Administrador", role: "admin" }],
+        users: [
+            { username: "admin", password: "admin", name: "Administrador", role: "admin" }
+        ],
         notifications: []
     };
 
@@ -124,8 +144,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const getTodayDate = () => new Date().toISOString().slice(0, 10);
-
-    // --- FUNÇÃO DO RELÓGIO ---
+    
     const updateClock = () => {
         if (elements.liveClock) {
             const now = new Date();
@@ -1667,7 +1686,81 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const generatePDFReport = () => {
-        // ... (código existente)
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        
+        const reportType = document.querySelector('.report-type-card.active')?.dataset.report;
+        const startDate = document.getElementById('reportStartDate')?.value;
+        const endDate = document.getElementById('reportEndDate')?.value;
+        
+        if (!reportType) {
+            alert('Selecione um tipo de relatório primeiro.');
+            return;
+        }
+        
+        if (!startDate || !endDate) {
+            alert('Selecione um período para o relatório.');
+            return;
+        }
+        
+        doc.setFontSize(18);
+        doc.text(`Relatório - ${reportType.toUpperCase()}`, 105, 15, { align: 'center' });
+        doc.setFontSize(12);
+        doc.text(`Período: ${formatDate(startDate)} até ${formatDate(endDate)}`, 105, 25, { align: 'center' });
+        
+        let yPosition = 35;
+        
+        switch(reportType) {
+            case 'sales':
+                const filteredSales = DB.sales.filter(s => new Date(s.date) >= new Date(startDate) && new Date(s.date) <= new Date(endDate));
+                doc.text(`Total de Vendas: ${formatCurrency(filteredSales.reduce((acc, s) => acc + s.total, 0))}`, 14, yPosition);
+                yPosition += 10;
+                doc.autoTable({
+                    startY: yPosition,
+                    head: [['Data', 'Cliente', 'Valor', 'Pagamento']],
+                    body: filteredSales.map(s => [formatDate(s.date), s.client, formatCurrency(s.total), s.paymentMethod || 'N/D'])
+                });
+                break;
+            case 'products':
+                doc.text(`Valor Total do Estoque: ${formatCurrency(DB.products.reduce((acc, p) => acc + (p.quantity * p.costPrice), 0))}`, 14, yPosition);
+                yPosition += 10;
+                doc.autoTable({
+                    startY: yPosition,
+                    head: [['Nome', 'Estoque', 'Mínimo', 'Preço Venda']],
+                    body: DB.products.map(p => [p.name, p.quantity, p.lowStockThreshold, formatCurrency(p.salePrice)])
+                });
+                break;
+            case 'financial':
+                const salesInPeriod = DB.sales.filter(s => new Date(s.date) >= new Date(startDate) && new Date(s.date) <= new Date(endDate));
+                const expensesInPeriod = DB.expenses.filter(e => new Date(e.date) >= new Date(startDate) && new Date(e.date) <= new Date(endDate));
+                const totalSales = salesInPeriod.reduce((acc, s) => acc + s.total, 0);
+                const totalExpenses = expensesInPeriod.reduce((acc, e) => acc + e.value, 0);
+                const profit = totalSales - totalExpenses;
+                
+                doc.text(`Receitas: ${formatCurrency(totalSales)}`, 14, yPosition); yPosition += 7;
+                doc.text(`Despesas: ${formatCurrency(totalExpenses)}`, 14, yPosition); yPosition += 7;
+                doc.text(`Lucro: ${formatCurrency(profit)}`, 14, yPosition); yPosition += 10;
+                
+                doc.autoTable({
+                    startY: yPosition,
+                    head: [['Data', 'Descrição', 'Categoria', 'Valor']],
+                    body: expensesInPeriod.map(e => [formatDate(e.date), e.description, e.category, formatCurrency(e.value)])
+                });
+                break;
+            case 'receivables':
+                const pendingReceivables = DB.receivables.filter(r => r.status === 'Pendente');
+                doc.text(`Total a Receber: ${formatCurrency(pendingReceivables.reduce((acc, r) => acc + r.value, 0))}`, 14, yPosition);
+                yPosition += 10;
+                doc.autoTable({
+                    startY: yPosition,
+                    head: [['Cliente', 'Valor', 'Vencimento', 'Status']],
+                    body: DB.receivables.map(r => [r.client, formatCurrency(r.value), formatDate(r.dueDate), r.status])
+                });
+                break;
+        }
+        
+        doc.save(`relatorio_${reportType}_${getTodayDate()}.pdf`);
+        showNotification('Relatório Gerado', `Relatório ${reportType} gerado com sucesso.`, 'success');
     };
 
     const clearTodaySales = () => {
